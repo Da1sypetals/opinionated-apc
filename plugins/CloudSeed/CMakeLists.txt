@@ -34,7 +34,10 @@ message(STATUS "CloudSeed: Building for ${PLUGIN_FORMATS}")
 juce_add_binary_data(CloudSeed_WebUI
     SOURCES
         Source/ui/public/index.html
+        Source/ui/public/css/style.css
         Source/ui/public/js/index.js
+        Source/ui/public/js/knob.js
+        Source/ui/public/js/format.js
         Source/ui/public/js/juce/index.js
         Source/ui/public/js/juce/check_native_interop.js
 )

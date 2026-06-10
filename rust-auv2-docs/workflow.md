@@ -33,16 +33,14 @@ plugins/CloudSeed/
 │   ├── PluginProcessor.h            juce::AudioProcessor subclass
 │   ├── PluginProcessor.cpp          parameter loop + FFI forwarding (~160 lines)
 │   ├── PluginEditor.h               WebView container
-│   ├── PluginEditor.cpp             relay setup + resource provider (~130 lines)
+│   ├── PluginEditor.cpp             relay setup + resource provider (~100 lines)
 │   └── ui/public/
-│       ├── index.html               full UI layout for 45 parameters
-│       └── js/
-│           ├── index.js             knob rendering, toggle logic, JUCE binding
-│           └── juce/
-│               ├── index.js         JUCE 8 WebView frontend library (SliderState, ToggleState, etc.)
-│               └── check_native_interop.js
-└── CMakeLists.txt                   Corrosion + JUCE, macOS AU-only
+│       └── index.html               ALL-IN-ONE: HTML + CSS + JS fully inlined (~570 lines)
+├── CMakeLists.txt                   Corrosion + JUCE, macOS AU-only
+└── build.py                         build/install/clear/validate CLI tool
 ```
+
+Production `index.html` contains everything inline: CSS in `<style>`, JUCE frontend library and UI logic in a single `<script>` block. No external JS/CSS files. See pitfall #6 below for why.
 
 ---
 
@@ -132,22 +130,37 @@ Member declaration order is critical (prevents DAW crash on unload):
 
 ### Channel Layout Support
 
-`isBusesLayoutSupported` must accept mono configurations for the plugin to appear on mono tracks in Logic Pro:
+Two things are required for the plugin to appear on mono tracks in Logic Pro:
+
+1. The `BusesProperties` constructor default must be mono, not stereo. If the default is stereo, the AU wrapper may not report mono as a valid initial configuration, and Logic Pro will hide the plugin from mono tracks.
+
+```cpp
+CloudSeedAudioProcessor::CloudSeedAudioProcessor()
+    : AudioProcessor (BusesProperties()
+                        .withInput  ("Input",  juce::AudioChannelSet::mono(), true)
+                        .withOutput ("Output", juce::AudioChannelSet::mono(), true)),
+```
+
+2. `isBusesLayoutSupported` must accept mono configurations:
 
 ```cpp
 bool isBusesLayoutSupported(const BusesLayout& layouts) const
 {
     auto outSet = layouts.getMainOutputChannelSet();
     auto inSet = layouts.getMainInputChannelSet();
-    if (outSet == juce::AudioChannelSet::stereo())
-        return inSet == juce::AudioChannelSet::stereo() || inSet == juce::AudioChannelSet::mono();
-    if (outSet == juce::AudioChannelSet::mono())
-        return inSet == juce::AudioChannelSet::mono();
+    if (inSet == juce::AudioChannelSet::mono() && outSet == juce::AudioChannelSet::mono())
+        return true;
+    if (inSet == juce::AudioChannelSet::mono() && outSet == juce::AudioChannelSet::stereo())
+        return true;
+    if (inSet == juce::AudioChannelSet::stereo() && outSet == juce::AudioChannelSet::stereo())
+        return true;
     return false;
 }
 ```
 
-processBlock handles mono input by passing the same pointer for both L and R to the Rust stereo processor.
+Do NOT use `JucePlugin_PreferredChannelConfigurations` for this. It interacts badly with the AU wrapper and produces incorrect channel capability reports (observed: `[1,2] [2,0]` instead of the correct `[1,1] [1,2] [2,2]`).
+
+processBlock handles mono input by duplicating the single channel pointer for both L and R to the Rust stereo processor. For mono output, it processes in stereo internally and writes only the left channel back.
 
 ---
 
@@ -155,17 +168,29 @@ processBlock handles mono input by passing the same pointer for both L and R to 
 
 ### JUCE 8 WebView Parameter Protocol
 
-JUCE 8 provides a JavaScript library (js/juce/index.js) that exposes:
-- `getSliderState(name)` -> `SliderState` object with `.getNormalisedValue()`, `.setNormalisedValue()`, `.sliderDragStarted()`, `.sliderDragEnded()`, `.valueChangedEvent`
-- `getToggleState(name)` -> `ToggleState` object with `.getValue()`, `.setValue()`, `.valueChangedEvent`
+JUCE 8 provides a JavaScript library that exposes:
+- `getSliderState(name)` -> `SliderState` object with `.getNormalisedValue()`, `.setNormalisedValue()`, `.sliderDragStarted()`, `.sliderDragEnded()`, `.addListener(fn)`
+- `getToggleState(name)` -> `ToggleState` object with `.getValue()`, `.setValue()`, `.addListener(fn)`
 
 The name string must match the relay name declared in C++ (e.g., `"late_line_decay"`).
 
+In production, this library must be inlined into `index.html` as plain ES5-compatible JavaScript (function/prototype style, not ES6 class/import). See pitfall #6.
+
 ### UI Implementation
+
+All JS and CSS are inlined into a single `index.html`. The JUCE frontend library is reimplemented inline using function constructors and prototype methods (not ES6 classes) to avoid module loading issues.
 
 All 45 parameters rendered as either SVG arc knobs (continuous) or CSS toggle switches (boolean). Knob interaction: vertical mouse drag with shift-for-fine-control. Double-click resets to default.
 
 Parameter value display uses the same scaling formulas as the Rust `scale_param` function to show physical units (Hz, ms, dB, %).
+
+### Layout for 40+ Parameters
+
+Use a sectioned grid layout. Sections are grouped by DSP signal path, not alphabetically. The main area uses `display: grid` with `grid-template-columns: 1fr 1fr 1fr` and `grid-template-rows: auto auto`. The largest section (Late Reverb, 12 params) spans 2 columns via `grid-column: span 2`. A bottom bar holds utility params (seeds) in a horizontal flex row.
+
+Use `auto` for grid row heights, not `1fr`. Fixed `1fr` rows cause overflow when sections have different numbers of parameters. Let the content determine each row's height.
+
+Do not set `overflow: hidden` on section panels. If content exceeds the panel due to knob sizes or spacing, it will be silently clipped with no visible error.
 
 ---
 
@@ -200,33 +225,40 @@ juce_add_plugin(CloudSeed
 
 ### Binary Data for Web Resources
 
+Since all JS/CSS is inlined into `index.html`, only one file needs to be embedded:
+
 ```cmake
 juce_add_binary_data(CloudSeed_WebUI
     SOURCES
         Source/ui/public/index.html
-        Source/ui/public/js/index.js
-        Source/ui/public/js/juce/index.js
-        Source/ui/public/js/juce/check_native_interop.js
 )
 ```
 
-JUCE embeds these files into C++ source as byte arrays. The resource provider in PluginEditor.cpp maps URL paths to BinaryData symbols. Note: when multiple files have the same name in different directories (e.g., two `index.js`), JUCE mangles the BinaryData symbol for the second one as `index_js2`.
+JUCE embeds this file into C++ source as a byte array (`BinaryData::index_html` / `BinaryData::index_htmlSize`). The resource provider in PluginEditor.cpp maps the root URL to this single resource.
+
+If you must embed multiple files (not recommended for production): when multiple files have the same name in different directories (e.g., two `index.js`), JUCE mangles the BinaryData symbol for the second one as `index_js2`.
 
 ---
 
 ## Build Commands
 
+A `build.py` script wraps all build operations:
+
 ```bash
-# Configure (first time or after CMakeLists changes)
+python3 plugins/CloudSeed/build.py build          # Build AU + Standalone
+python3 plugins/CloudSeed/build.py build --au-only # Build AU only
+python3 plugins/CloudSeed/build.py install         # Install AU to ~/Library/Audio/Plug-Ins/Components/
+python3 plugins/CloudSeed/build.py clear           # Clear all AU caches (system + Logic Pro)
+python3 plugins/CloudSeed/build.py validate        # Run auval
+python3 plugins/CloudSeed/build.py all             # build --au-only -> install -> clear -> validate
+```
+
+Equivalent manual commands:
+
+```bash
 cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64
-
-# Build AU
 cmake --build build --target CloudSeed_AU --config Release -j$(sysctl -n hw.ncpu)
-
-# Install
 cp -R build/plugins/CloudSeed/CloudSeed_artefacts/Release/AU/CloudSeed.component ~/Library/Audio/Plug-Ins/Components/
-
-# Validate
 auval -v aufx CSed Nfld
 ```
 
@@ -259,17 +291,36 @@ Problem: `isBusesLayoutSupported` only accepted stereo-stereo, so Logic Pro hid 
 
 Solution: Accept mono-mono and mono-stereo layouts in `isBusesLayoutSupported`. Handle mono input in processBlock by passing the same channel pointer for both L and R.
 
-### 3. Logic Pro AU cache
+### 3. Logic Pro AU cache (multiple layers)
 
-Problem: After installing a new/updated AU, Logic Pro may not show it because it caches plugin validation results aggressively.
+Problem: After changing an AU plugin's capabilities (channel configs, parameter list), Logic Pro does not see the changes. The plugin may be invisible on mono tracks even though `auval` confirms mono support.
 
-Solution: Kill AudioComponentRegistrar, delete AU cache files, then restart Logic Pro:
+Root cause: There are THREE separate AU caches, all of which can hold stale data:
+
+1. **System AudioComponentRegistrar daemon** — in-memory cache of registered AU components.
+2. **System AudioComponentCache plist** — `~/Library/Preferences/com.apple.audio.AudioComponentCache.plist`. Stores channel configurations, bus counts, etc.
+3. **Logic Pro's own per-plugin cache** — stored inside `~/Library/Preferences/com.apple.logic10.plist` under keys like `"aufx-CSed-Nfld"`. Contains its own copy of `ChannelConfigurations`.
+
+Deleting only the system caches (items 1 and 2) does NOT fix the problem if Logic's own plist (item 3) still has stale data. Logic reads its own plist first.
+
+Solution — clear all three:
 ```bash
 killall -9 AudioComponentRegistrar
+rm -f ~/Library/Preferences/com.apple.audio.AudioComponentCache.plist
 rm -rf ~/Library/Caches/AudioUnitCache/
-rm -rf ~/Library/Caches/com.apple.logic10/
+defaults delete com.apple.logic10 "aufx-CSed-Nfld"
 ```
-Logic Pro will re-validate all plugins on next launch.
+Then restart Logic Pro. It will re-scan the AU and write fresh entries.
+
+Generalized form for the Logic plist key: `"<type>-<subtype>-<manufacturer>"`, e.g. `"aufx-CSed-Nfld"`.
+
+Diagnostic: if `auval` and the AudioComponent C API both report correct channel configs but Logic still hides the plugin, run:
+```bash
+plutil -p ~/Library/Preferences/com.apple.logic10.plist | grep -A 15 "aufx-CSed-Nfld"
+```
+If the cached `ChannelConfigurations` array is wrong, delete the key.
+
+See `rust-auv2-docs/logic-pro-au-cache.md` for the full writeup.
 
 ### 4. JUCE WebView member destruction order
 
@@ -284,7 +335,40 @@ Solution: Declare members in this exact order in the Editor header:
 
 Problem: Two files named `index.js` in different directories (`js/index.js` and `js/juce/index.js`) get mangled by JUCE's BinaryData generator. The second one becomes `index_js2` / `index_js2Size`.
 
-Solution: In the resource provider, map URL paths explicitly to the correct BinaryData symbols.
+Solution: In the resource provider, map URL paths explicitly to the correct BinaryData symbols. Better solution: inline everything into `index.html` so only one file is embedded. This eliminates the mangling issue entirely.
+
+### 6. ES6 modules fail silently in JUCE WebView
+
+Problem: `<script type="module" src="js/index.js">` fails silently in JUCE's WebView (WKWebView on macOS, WebView2 on Windows). The UI loads but shows no interactivity — knobs render as static dots, toggles do not respond, no JS errors are visible.
+
+This is because JUCE's resource provider serves files via a custom URL scheme (`juce://juce.backend/`). ES6 module loading requires CORS headers that the resource provider does not set. The `import` statements fail with CORS errors that are swallowed silently.
+
+Solution: ALL JavaScript must be inlined in `index.html` within a plain `<script>` block (not `<script type="module">`). The JUCE frontend library (SliderState, ToggleState, etc.) must be reimplemented or copied inline using ES5-compatible syntax (function constructors, not ES6 classes). All CSS must also be inline in `<style>`.
+
+The production `index.html` should be a single self-contained file with zero external dependencies. The `js/` directory can remain for reference/development but is not loaded by the plugin.
+
+### 7. BusesProperties default determines AU channel visibility
+
+Problem: Setting `BusesProperties` default to stereo in the AudioProcessor constructor causes the AU wrapper to report stereo as the only valid initial configuration. Even if `isBusesLayoutSupported` returns true for mono, Logic Pro may not show the plugin on mono tracks because it checks the initial/default configuration separately.
+
+Solution: Set the default to mono:
+```cpp
+.withInput("Input", juce::AudioChannelSet::mono(), true)
+.withOutput("Output", juce::AudioChannelSet::mono(), true)
+```
+The AU wrapper will then report mono as a valid initial state. `isBusesLayoutSupported` still handles the runtime negotiation for stereo.
+
+### 8. JucePlugin_PreferredChannelConfigurations produces wrong AU reports
+
+Problem: Using `JucePlugin_PreferredChannelConfigurations={1,1},{1,2},{2,2}` as a compile definition was expected to declare supported channel configs. Instead, the AU wrapper reported `[1,2] [2,0]` (where `[2,0]` is a wildcard meaning "2 in, any out"), losing the explicit `[1,1]` and `[2,2]` entries.
+
+Solution: Do not use `JucePlugin_PreferredChannelConfigurations`. Use `BusesProperties` + `isBusesLayoutSupported` instead. This is the only reliable method for controlling AU channel configuration reporting.
+
+### 9. CSS overflow: hidden silently clips plugin UI
+
+Problem: Setting `overflow: hidden` on section panels causes knobs and toggles at the bottom of a panel to be invisible. Combined with fixed-height grid rows (`grid-template-rows: 1fr 1fr`), this makes it appear as if UI elements are missing, with no visible error.
+
+Solution: Use `overflow: visible` on panels. Use `grid-template-rows: auto auto` instead of `1fr 1fr` so rows size to their content. Set `min-height` instead of `height` on the body and container so the page can grow if needed.
 
 ---
 

@@ -58,7 +58,7 @@ CloudSeedAudioProcessorEditor::CloudSeedAudioProcessorEditor (CloudSeedAudioProc
     addAndMakeVisible(*webView);
     webView->goToURL(juce::WebBrowserComponent::getResourceProviderRoot());
 
-    setSize(900, 600);
+    setSize(900, 720);
     startTimerHz(30);
 }
 
@@ -96,13 +96,19 @@ const char* CloudSeedAudioProcessorEditor::getMimeForExtension(const juce::Strin
 
 std::optional<juce::WebBrowserComponent::Resource> CloudSeedAudioProcessorEditor::getResource(const juce::String& url)
 {
-    auto resourcePath = url.fromFirstOccurrenceOf(
-        juce::WebBrowserComponent::getResourceProviderRoot(), false, false);
+    auto root = juce::WebBrowserComponent::getResourceProviderRoot();
+    juce::String path;
 
-    if (resourcePath.isEmpty() || resourcePath == "/")
-        resourcePath = "/index.html";
+    if (url.startsWith(root))
+        path = url.substring(root.length());
+    else
+        path = url;
 
-    auto path = resourcePath.substring(1); // 去掉前导斜杠
+    if (path.startsWith("/"))
+        path = path.substring(1);
+
+    if (path.isEmpty())
+        path = "index.html";
 
     // 查找 BinaryData 资源
     const char* resourceData = nullptr;
@@ -115,10 +121,28 @@ std::optional<juce::WebBrowserComponent::Resource> CloudSeedAudioProcessorEditor
         resourceSize = BinaryData::index_htmlSize;
         mimeType = "text/html";
     }
+    else if (path == "css/style.css")
+    {
+        resourceData = BinaryData::style_css;
+        resourceSize = BinaryData::style_cssSize;
+        mimeType = "text/css";
+    }
     else if (path == "js/index.js")
     {
         resourceData = BinaryData::index_js;
         resourceSize = BinaryData::index_jsSize;
+        mimeType = "text/javascript";
+    }
+    else if (path == "js/knob.js")
+    {
+        resourceData = BinaryData::knob_js;
+        resourceSize = BinaryData::knob_jsSize;
+        mimeType = "text/javascript";
+    }
+    else if (path == "js/format.js")
+    {
+        resourceData = BinaryData::format_js;
+        resourceSize = BinaryData::format_jsSize;
         mimeType = "text/javascript";
     }
     else if (path == "js/juce/index.js")
