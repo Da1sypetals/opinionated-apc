@@ -17,7 +17,6 @@ If you need to add a rust crate, you will need to add a line that points to `Car
 Below is the README of the original project
 
 # Audio Plugin Coder (APC)
-![Audio Plugin Coder Logo](https://github.com/Noizefield/audio-plugin-coder/blob/main/assets/APC_Logo.gif)
 
 > AI-powered open-source framework for vibe-coding audio plugins from concept to shipped product
 
