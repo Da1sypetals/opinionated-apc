@@ -1,106 +1,132 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CloudSeed - Algorithmic Reverb</title>
-    <link rel="stylesheet" href="css/style.css">
+<meta charset="UTF-8">
+<title>CloudSeed – Algorithmic Reverb</title>
+<link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-<div class="container">
-    <div class="header">
-        <h1>CloudSeed</h1>
-        <div class="sub">Algorithmic Reverb</div>
+
+<div class="plugin">
+  <div class="header">
+    <div class="header-title">CLOUDSEED</div>
+  </div>
+
+  <div class="body">
+    <div class="top-card">
+
+      <!-- TAPS -->
+      <div class="section section-taps">
+        <div class="sec-title">TAPS</div>
+        <div class="sec-grid">
+          <div class="btn-cell"><button class="tbtn" data-p="tap_enabled" data-t="toggle">OFF</button></div>
+          <div class="empty-cell"></div>
+          <div class="knob-cell"><canvas class="kc" data-p="tap_count"></canvas><div class="klabel">COUNT</div></div>
+          <div class="knob-cell"><canvas class="kc" data-p="tap_decay"></canvas><div class="klabel">DECAY</div></div>
+          <div class="knob-cell"><canvas class="kc" data-p="tap_predelay"></canvas><div class="klabel">PRE-DELAY</div></div>
+          <div class="knob-cell"><canvas class="kc" data-p="tap_length"></canvas><div class="klabel">LENGTH</div></div>
+        </div>
+      </div>
+
+      <!-- DIFFUSION -->
+      <div class="section section-diff">
+        <div class="sec-title">DIFFUSION</div>
+        <div class="sec-grid">
+          <div class="btn-cell"><button class="tbtn" data-p="early_diffuse_enabled" data-t="toggle">OFF</button></div>
+          <div class="btn-cell"><button class="tbtn num-btn on" data-p="early_diffuse_count" data-t="num">1</button></div>
+          <div class="knob-cell"><canvas class="kc" data-p="early_diffuse_delay"></canvas><div class="klabel">DELAY</div></div>
+          <div class="knob-cell"><canvas class="kc" data-p="early_diffuse_mod_amount"></canvas><div class="klabel">MOD AMT</div></div>
+          <div class="knob-cell"><canvas class="kc" data-p="early_diffuse_feedback"></canvas><div class="klabel">FEEDBACK</div></div>
+          <div class="knob-cell"><canvas class="kc" data-p="early_diffuse_mod_rate"></canvas><div class="klabel">MOD RATE</div></div>
+        </div>
+      </div>
+
+      <!-- LATE REFLECTIONS -->
+      <div class="section section-late">
+        <div class="sec-title">LATE REFLECTIONS</div>
+        <div class="sec-grid">
+          <div class="btn-cell"><button class="tbtn" data-p="late_mode" data-t="toggle">PRE</button></div>
+          <div class="btn-cell"><button class="tbtn num-btn on" data-p="late_line_count" data-t="num">1</button></div>
+          <div class="btn-cell"><button class="tbtn" data-p="late_diffuse_enabled" data-t="toggle">OFF</button></div>
+          <div class="btn-cell"><button class="tbtn num-btn on" data-p="late_diffuse_count" data-t="num">1</button></div>
+          <div class="knob-cell"><canvas class="kc" data-p="late_line_size"></canvas><div class="klabel">SIZE</div></div>
+          <div class="knob-cell"><canvas class="kc" data-p="late_line_mod_amount"></canvas><div class="klabel">MOD AMT</div></div>
+          <div class="knob-cell"><canvas class="kc" data-p="late_diffuse_delay"></canvas><div class="klabel">DELAY</div></div>
+          <div class="knob-cell"><canvas class="kc" data-p="late_diffuse_mod_amount"></canvas><div class="klabel">MOD AMT</div></div>
+          <div class="knob-cell"><canvas class="kc" data-p="late_line_decay"></canvas><div class="klabel">DECAY</div></div>
+          <div class="knob-cell"><canvas class="kc" data-p="late_line_mod_rate"></canvas><div class="klabel">MOD RATE</div></div>
+          <div class="knob-cell"><canvas class="kc" data-p="late_diffuse_feedback"></canvas><div class="klabel">FEEDBACK</div></div>
+          <div class="knob-cell"><canvas class="kc" data-p="late_diffuse_mod_rate"></canvas><div class="klabel">MOD RATE</div></div>
+        </div>
+      </div>
+
+      <!-- EQUALISATION -->
+      <div class="section section-eq">
+        <div class="sec-title">EQUALISATION</div>
+        <div class="sec-grid">
+          <div class="btn-cell"><button class="tbtn" data-p="eq_low_shelf_enabled" data-t="toggle">OFF</button></div>
+          <div class="btn-cell"><button class="tbtn" data-p="eq_high_shelf_enabled" data-t="toggle">OFF</button></div>
+          <div class="btn-cell"><button class="tbtn" data-p="eq_lowpass_enabled" data-t="toggle">OFF</button></div>
+          <div class="knob-cell"><canvas class="kc" data-p="eq_low_freq"></canvas><div class="klabel">LOW FREQ</div></div>
+          <div class="knob-cell"><canvas class="kc" data-p="eq_high_freq"></canvas><div class="klabel">HIGH FREQ</div></div>
+          <div class="knob-cell"><canvas class="kc" data-p="eq_cutoff"></canvas><div class="klabel">CUTOFF</div></div>
+          <div class="eq-row2-span">
+            <div class="knob-cell"><canvas class="kc" data-p="eq_low_gain"></canvas><div class="klabel">LOW GAIN</div></div>
+            <div class="knob-cell"><canvas class="kc" data-p="eq_high_gain"></canvas><div class="klabel">HIGH GAIN</div></div>
+          </div>
+        </div>
+      </div>
+
     </div>
 
-    <div class="main">
-        <!-- MIX / INPUT -->
-        <div class="section">
-            <div class="section-hdr"><span class="section-title">Mix / Input</span><span class="section-line"></span></div>
-            <div class="params">
-                <div class="pc" data-p="dry_out" data-t="s"><div class="pc-label">Dry</div><div class="knob"></div><div class="pc-val"></div></div>
-                <div class="pc" data-p="early_out" data-t="s"><div class="pc-label">Early</div><div class="knob"></div><div class="pc-val"></div></div>
-                <div class="pc" data-p="late_out" data-t="s"><div class="pc-label">Late</div><div class="knob"></div><div class="pc-val"></div></div>
-                <div class="pc" data-p="input_mix" data-t="s"><div class="pc-label">Input Mix</div><div class="knob"></div><div class="pc-val"></div></div>
-                <div class="pc" data-p="low_cut_enabled" data-t="b"><div class="pc-label">Low Cut</div><div class="tog"></div><div class="pc-val"></div></div>
-                <div class="pc" data-p="high_cut_enabled" data-t="b"><div class="pc-label">High Cut</div><div class="tog"></div><div class="pc-val"></div></div>
-                <div class="pc" data-p="low_cut" data-t="s"><div class="pc-label">Low Freq</div><div class="knob"></div><div class="pc-val"></div></div>
-                <div class="pc" data-p="high_cut" data-t="s"><div class="pc-label">High Freq</div><div class="knob"></div><div class="pc-val"></div></div>
-                <div class="pc" data-p="interpolation" data-t="b"><div class="pc-label">Interp</div><div class="tog"></div><div class="pc-val"></div></div>
-            </div>
+    <!-- BOTTOM AREA -->
+    <div class="bottom-area">
+      <div class="faders-group">
+        <div class="fader-col">
+          <div class="fader-track" data-p="dry_out"><div class="fader-thumb"></div></div>
+          <div class="fader-label">DRY</div>
         </div>
+        <div class="fader-col">
+          <div class="fader-track" data-p="early_out"><div class="fader-thumb"></div></div>
+          <div class="fader-label">EARLY</div>
+        </div>
+        <div class="fader-col">
+          <div class="fader-track" data-p="late_out"><div class="fader-thumb"></div></div>
+          <div class="fader-label">LATE</div>
+        </div>
+      </div>
 
-        <!-- EARLY REFLECTIONS -->
-        <div class="section">
-            <div class="section-hdr"><span class="section-title">Early Reflections</span><span class="section-line"></span></div>
-            <div class="params">
-                <div class="pc" data-p="tap_enabled" data-t="b"><div class="pc-label">Enable</div><div class="tog"></div><div class="pc-val"></div></div>
-                <div class="pc" data-p="tap_count" data-t="s"><div class="pc-label">Count</div><div class="knob"></div><div class="pc-val"></div></div>
-                <div class="pc" data-p="tap_decay" data-t="s"><div class="pc-label">Decay</div><div class="knob"></div><div class="pc-val"></div></div>
-                <div class="pc" data-p="tap_predelay" data-t="s"><div class="pc-label">Pre-Delay</div><div class="knob"></div><div class="pc-val"></div></div>
-                <div class="pc" data-p="tap_length" data-t="s"><div class="pc-label">Length</div><div class="knob"></div><div class="pc-val"></div></div>
-            </div>
+      <div class="bottom-right">
+        <div class="bottom-btn-row">
+          <div class="bottom-btn-cell"><button class="tbtn" data-p="interpolation" data-t="toggle">OFF</button></div>
+          <div class="bottom-btn-cell"><button class="tbtn" data-p="high_cut_enabled" data-t="toggle">OFF</button></div>
+          <div class="bottom-btn-cell"><button class="tbtn" data-p="low_cut_enabled" data-t="toggle">OFF</button></div>
         </div>
-
-        <!-- EARLY DIFFUSION -->
-        <div class="section">
-            <div class="section-hdr"><span class="section-title">Early Diffusion</span><span class="section-line"></span></div>
-            <div class="params">
-                <div class="pc" data-p="early_diffuse_enabled" data-t="b"><div class="pc-label">Enable</div><div class="tog"></div><div class="pc-val"></div></div>
-                <div class="pc" data-p="early_diffuse_count" data-t="s"><div class="pc-label">Stages</div><div class="knob"></div><div class="pc-val"></div></div>
-                <div class="pc" data-p="early_diffuse_delay" data-t="s"><div class="pc-label">Delay</div><div class="knob"></div><div class="pc-val"></div></div>
-                <div class="pc" data-p="early_diffuse_mod_amount" data-t="s"><div class="pc-label">Mod Amt</div><div class="knob"></div><div class="pc-val"></div></div>
-                <div class="pc" data-p="early_diffuse_feedback" data-t="s"><div class="pc-label">Feedback</div><div class="knob"></div><div class="pc-val"></div></div>
-                <div class="pc" data-p="early_diffuse_mod_rate" data-t="s"><div class="pc-label">Mod Rate</div><div class="knob"></div><div class="pc-val"></div></div>
-            </div>
+        <div class="bottom-knobs-row">
+          <div class="knob-cell"><canvas class="kc big" data-p="input_mix"></canvas><div class="klabel">INPUT MIX</div></div>
+          <div class="knob-cell"><canvas class="kc big" data-p="high_cut"></canvas><div class="klabel">HIGH CUT</div></div>
+          <div class="knob-cell"><canvas class="kc big" data-p="low_cut"></canvas><div class="klabel">LOW CUT</div></div>
+          <div class="knob-cell"><canvas class="kc big" data-p="eq_cross_seed"></canvas><div class="klabel">CROSS SEED</div></div>
         </div>
-
-        <!-- LATE REVERB (wide) -->
-        <div class="section wide">
-            <div class="section-hdr"><span class="section-title">Late Reverb</span><span class="section-line"></span></div>
-            <div class="params">
-                <div class="pc" data-p="late_mode" data-t="b"><div class="pc-label">Post Mode</div><div class="tog"></div><div class="pc-val"></div></div>
-                <div class="pc" data-p="late_diffuse_enabled" data-t="b"><div class="pc-label">Diffusion</div><div class="tog"></div><div class="pc-val"></div></div>
-                <div class="pc" data-p="late_line_count" data-t="s"><div class="pc-label">Lines</div><div class="knob"></div><div class="pc-val"></div></div>
-                <div class="pc" data-p="late_line_size" data-t="s"><div class="pc-label">Size</div><div class="knob"></div><div class="pc-val"></div></div>
-                <div class="pc" data-p="late_line_decay" data-t="s"><div class="pc-label">Decay</div><div class="knob"></div><div class="pc-val"></div></div>
-                <div class="pc" data-p="late_line_mod_amount" data-t="s"><div class="pc-label">Line Mod</div><div class="knob"></div><div class="pc-val"></div></div>
-                <div class="pc" data-p="late_line_mod_rate" data-t="s"><div class="pc-label">Line Rate</div><div class="knob"></div><div class="pc-val"></div></div>
-                <div class="pc" data-p="late_diffuse_count" data-t="s"><div class="pc-label">Diff Stages</div><div class="knob"></div><div class="pc-val"></div></div>
-                <div class="pc" data-p="late_diffuse_delay" data-t="s"><div class="pc-label">Diff Delay</div><div class="knob"></div><div class="pc-val"></div></div>
-                <div class="pc" data-p="late_diffuse_mod_amount" data-t="s"><div class="pc-label">Diff Mod</div><div class="knob"></div><div class="pc-val"></div></div>
-                <div class="pc" data-p="late_diffuse_feedback" data-t="s"><div class="pc-label">Diff FB</div><div class="knob"></div><div class="pc-val"></div></div>
-                <div class="pc" data-p="late_diffuse_mod_rate" data-t="s"><div class="pc-label">Diff Rate</div><div class="knob"></div><div class="pc-val"></div></div>
-            </div>
-        </div>
-
-        <!-- EQ -->
-        <div class="section">
-            <div class="section-hdr"><span class="section-title">EQ</span><span class="section-line"></span></div>
-            <div class="params">
-                <div class="pc" data-p="eq_low_shelf_enabled" data-t="b"><div class="pc-label">Low Shelf</div><div class="tog"></div><div class="pc-val"></div></div>
-                <div class="pc" data-p="eq_high_shelf_enabled" data-t="b"><div class="pc-label">High Shelf</div><div class="tog"></div><div class="pc-val"></div></div>
-                <div class="pc" data-p="eq_lowpass_enabled" data-t="b"><div class="pc-label">Lowpass</div><div class="tog"></div><div class="pc-val"></div></div>
-                <div class="pc" data-p="eq_low_freq" data-t="s"><div class="pc-label">Low Freq</div><div class="knob"></div><div class="pc-val"></div></div>
-                <div class="pc" data-p="eq_high_freq" data-t="s"><div class="pc-label">High Freq</div><div class="knob"></div><div class="pc-val"></div></div>
-                <div class="pc" data-p="eq_cutoff" data-t="s"><div class="pc-label">Cutoff</div><div class="knob"></div><div class="pc-val"></div></div>
-                <div class="pc" data-p="eq_low_gain" data-t="s"><div class="pc-label">Low Gain</div><div class="knob"></div><div class="pc-val"></div></div>
-                <div class="pc" data-p="eq_high_gain" data-t="s"><div class="pc-label">High Gain</div><div class="knob"></div><div class="pc-val"></div></div>
-                <div class="pc" data-p="eq_cross_seed" data-t="s"><div class="pc-label">Cross Seed</div><div class="knob"></div><div class="pc-val"></div></div>
-            </div>
-        </div>
+      </div>
     </div>
+  </div>
 
-    <!-- SEEDS -->
-    <div class="bottom">
-        <span class="section-title">Seeds</span>
-        <div class="params">
-            <div class="pc" data-p="seed_tap" data-t="s"><div class="pc-label">Tap</div><div class="knob"></div><div class="pc-val"></div></div>
-            <div class="pc" data-p="seed_diffusion" data-t="s"><div class="pc-label">Diffusion</div><div class="knob"></div><div class="pc-val"></div></div>
-            <div class="pc" data-p="seed_delay" data-t="s"><div class="pc-label">Delay</div><div class="knob"></div><div class="pc-val"></div></div>
-            <div class="pc" data-p="seed_post_diffusion" data-t="s"><div class="pc-label">Post Diff</div><div class="knob"></div><div class="pc-val"></div></div>
-        </div>
+  <!-- FOOTER -->
+  <div class="footer">
+    <div class="footer-seeds">
+      <span class="seed-val" data-p="seed_tap">000</span>
+      <span class="seed-val" data-p="seed_diffusion">000</span>
+      <span class="seed-val" data-p="seed_delay">000</span>
+      <span class="seed-val" data-p="seed_post_diffusion">000</span>
+      <div class="seed-arrows">
+        <button class="seed-arrow" id="seed-prev">&#9664;</button>
+        <button class="seed-arrow" id="seed-next">&#9654;</button>
+      </div>
     </div>
+    <div class="footer-preset">[FX] DARK PLATE</div>
+    <div class="footer-readout" id="readout"></div>
+  </div>
 </div>
 
 <script type="module" src="js/index.js"></script>

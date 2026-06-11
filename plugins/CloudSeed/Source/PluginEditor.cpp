@@ -58,7 +58,7 @@ CloudSeedAudioProcessorEditor::CloudSeedAudioProcessorEditor (CloudSeedAudioProc
     addAndMakeVisible(*webView);
     webView->goToURL(juce::WebBrowserComponent::getResourceProviderRoot());
 
-    setSize(900, 720);
+    setSize(900, 540);
     startTimerHz(30);
 }
 

@@ -1,45 +1,63 @@
-var ARC_START = 135, ARC_END = 405, ARC_RANGE = 270;
+const SA = Math.PI * 0.75;
+const EA = Math.PI * 2.25;
+const ARC = EA - SA;
+const DPR = window.devicePixelRatio || 1;
 
-function polar(cx, cy, r, deg) {
-    var rad = (deg - 90) * Math.PI / 180;
-    return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
-}
+export function drawKnob(c, val) {
+    const sz = c._sz;
+    c.width = sz * DPR;
+    c.height = sz * DPR;
+    c.style.width = sz + 'px';
+    c.style.height = sz + 'px';
 
-function arc(cx, cy, r, s, e) {
-    var a = polar(cx, cy, r, e), b = polar(cx, cy, r, s);
-    return "M " + a.x + " " + a.y + " A " + r + " " + r + " 0 " + (e - s > 180 ? "1" : "0") + " 0 " + b.x + " " + b.y;
-}
+    const ctx = c.getContext('2d');
+    ctx.scale(DPR, DPR);
+    ctx.clearRect(0, 0, sz, sz);
 
-export function makeKnob(el) {
-    var sz = 44, cx = sz / 2, cy = sz / 2, r = 16;
-    var ns = "http://www.w3.org/2000/svg";
-    var svg = document.createElementNS(ns, "svg");
-    svg.setAttribute("viewBox", "0 0 " + sz + " " + sz);
-    svg.setAttribute("width", sz);
-    svg.setAttribute("height", sz);
+    const cx = sz / 2, cy = sz / 2, r = sz * 0.36;
 
-    var track = document.createElementNS(ns, "path");
-    track.setAttribute("d", arc(cx, cy, r, ARC_START, ARC_END));
-    track.setAttribute("class", "knob-track");
-    svg.appendChild(track);
+    // 旋钮主体（渐变圆 + 阴影）
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.22)';
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetY = 1.5;
+    const g = ctx.createRadialGradient(cx - r * 0.25, cy - r * 0.2, r * 0.05, cx, cy, r);
+    g.addColorStop(0, '#e2ecf4');
+    g.addColorStop(0.6, '#cad5df');
+    g.addColorStop(1, '#b5c4cf');
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.restore();
 
-    var fill = document.createElementNS(ns, "path");
-    fill.setAttribute("class", "knob-arc");
-    svg.appendChild(fill);
+    const trackR = r + 5;
 
-    var dot = document.createElementNS(ns, "circle");
-    dot.setAttribute("r", "2.5");
-    dot.setAttribute("class", "knob-dot");
-    svg.appendChild(dot);
+    // 弧形轨道背景
+    ctx.beginPath();
+    ctx.arc(cx, cy, trackR, SA, EA);
+    ctx.strokeStyle = 'rgba(80,110,130,0.2)';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.stroke();
 
-    el.appendChild(svg);
-    return { svg: svg, fill: fill, dot: dot, cx: cx, cy: cy, r: r };
-}
+    // 弧形填充
+    const va = SA + val * ARC;
+    if (val > 0.005) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, trackR, SA, va);
+        ctx.strokeStyle = '#3b5e77';
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+    }
 
-export function updateKnob(k, norm) {
-    var angle = ARC_START + norm * ARC_RANGE;
-    k.fill.setAttribute("d", norm < 0.002 ? "" : arc(k.cx, k.cy, k.r, ARC_START, angle));
-    var p = polar(k.cx, k.cy, k.r - 6, angle);
-    k.dot.setAttribute("cx", p.x);
-    k.dot.setAttribute("cy", p.y);
+    // 指示线
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(va) * r * 0.5, cy + Math.sin(va) * r * 0.5);
+    ctx.lineTo(cx + Math.cos(va) * r * 0.88, cy + Math.sin(va) * r * 0.88);
+    ctx.strokeStyle = '#3b5e77';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.stroke();
 }

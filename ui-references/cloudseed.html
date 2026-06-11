@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CloudSeed – Ghost Note Audio</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #1e2d38;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  font-family: 'Rajdhani', sans-serif;
+}
+
+/* ═══ PLUGIN SHELL ═══ */
+.plugin {
+  width: 900px;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 24px 70px rgba(0,0,0,0.65);
+}
+
+/* ═══ HEADER ═══ */
+.header {
+  background: linear-gradient(170deg, #7b9fb8 0%, #5f8299 45%, #8aafc6 100%);
+  height: 70px;
+  display: flex;
+  align-items: center;
+  padding: 0 18px;
+  position: relative;
+}
+
+.logo { display: flex; align-items: center; gap: 9px; z-index: 1; }
+.logo svg { width: 22px; height: 30px; }
+.logo-lines { display: flex; flex-direction: column; line-height: 1.2; }
+.logo-lines .gn { font-size: 12px; font-weight: 600; letter-spacing: 2.5px; color: #26404f; }
+.logo-lines .au { font-size: 9px; font-weight: 400; letter-spacing: 3.5px; color: #3d5c6e; }
+
+.header-title {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  font-size: 28px; font-weight: 300; letter-spacing: 10px; color: #2e4555;
+  opacity: 0.8; pointer-events: none; white-space: nowrap;
+}
+
+/* ═══ BODY ═══ */
+.body {
+  background: linear-gradient(180deg, #bdc9d4 0%, #c5d2db 60%, #b4c5d1 100%);
+  padding: 12px 12px 0 12px;
+}
+
+/* ═══ TOP CARD ═══ */
+.top-card {
+  background: rgba(215,226,234,0.92);
+  border-radius: 10px;
+  border: 1px solid rgba(170,192,208,0.5);
+  padding: 12px 12px 14px 12px;
+  display: flex;
+  gap: 10px;
+}
+
+/* ═══ SECTION BOX ═══ */
+.section {
+  background: rgba(205,218,228,0.7);
+  border: 1px solid rgba(160,185,200,0.4);
+  border-radius: 8px;
+  padding: 10px 0 12px 0;
+}
+
+.sec-title {
+  font-size: 9.5px; font-weight: 600; letter-spacing: 2.5px; color: #4a6070;
+  padding: 0 12px;
+  margin-bottom: 8px;
+}
+
+/* Each section uses a column-grid approach so buttons align with knob columns */
+/* 
+  The core layout pattern: 
+  - Each "column" in a section is exactly KNOB_COL_W wide
+  - Buttons sit at the top of their column
+  - Knobs sit below, two rows
+*/
+
+.sec-grid {
+  display: grid;
+  /* rows: button-row, knob-row-1, knob-row-2 */
+  grid-template-rows: 26px auto auto;
+  row-gap: 4px;
+}
+
+/* TAPS: 2 columns */
+.section-taps  { flex: 0 0 auto; }
+.section-taps .sec-grid  { grid-template-columns: 80px 80px; }
+
+/* DIFFUSION: 2 columns */
+.section-diff  { flex: 0 0 auto; }
+.section-diff .sec-grid  { grid-template-columns: 80px 80px; }
+
+/* LATE REFLECTIONS: 4 columns */
+.section-late  { flex: 1 1 auto; }
+.section-late .sec-grid  { grid-template-columns: repeat(4, 1fr); }
+
+/* EQUALISATION: 3 columns */
+.section-eq    { flex: 0 0 auto; }
+.section-eq .sec-grid    { grid-template-columns: 74px 74px 74px; }
+
+/* ── Button cells ── */
+.btn-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+}
+
+/* Empty cell placeholder */
+.empty-cell { /* occupies grid cell but shows nothing */ }
+
+/* ── Knob cells ── */
+.knob-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 0;
+}
+
+/* EQ row 2: only 2 knobs centered across 3 cols */
+.eq-row2-span {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: center;
+  gap: 0;
+}
+
+/* ── Toggle button ── */
+.tbtn {
+  padding: 3px 10px 2px;
+  border-radius: 20px;
+  border: none;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 9.5px; font-weight: 600; letter-spacing: 1px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  outline: none;
+  white-space: nowrap;
+}
+.tbtn.off { background: #b0bec8; color: #6a808e; }
+.tbtn.on  { background: #3c5f78; color: #b8d0e0; }
+.tbtn:hover { filter: brightness(1.1); }
+
+/* ── Knob canvas ── */
+.kc { display: block; cursor: grab; }
+.kc:active { cursor: grabbing; }
+
+/* ── Knob label ── */
+.klabel {
+  font-size: 7.5px; font-weight: 600; letter-spacing: 1.2px;
+  color: #4a6070; white-space: nowrap; text-align: center;
+}
+
+/* ═══ BOTTOM AREA ═══ */
+/* Centered horizontally in the plugin body */
+.bottom-area {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  padding: 14px 0 16px 0;
+  gap: 20px;
+}
+
+/* Faders group */
+.faders-group {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.fader-col {
+  display: flex; flex-direction: column;
+  align-items: center; gap: 5px;
+}
+
+.fader-label {
+  font-size: 7.5px; font-weight: 600; letter-spacing: 1.5px; color: #4a6070;
+}
+
+.fader-track {
+  width: 4px;
+  height: 90px;
+  border-radius: 2px;
+  background: rgba(80,110,130,0.28);
+  position: relative;
+  cursor: ns-resize;
+}
+
+.fader-thumb {
+  position: absolute;
+  left: 50%; transform: translateX(-50%);
+  width: 14px; height: 5px;
+  background: linear-gradient(90deg, #7a9aab, #9dbdcc);
+  border-radius: 2px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+  cursor: ns-resize;
+}
+
+/* Right side of bottom: buttons + knobs stacked */
+.bottom-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+/* 3 OFF buttons — align with first 3 of 4 knob columns */
+.bottom-btn-row {
+  display: grid;
+  /* match widths of INPUT MIX, HIGH CUT, LOW CUT — 4th col CROSS SEED has no button */
+  grid-template-columns: 68px 68px 68px;
+  /* offset by half the 4th col to keep same grid as knobs below */
+}
+
+.bottom-btn-cell {
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* 4 bottom knobs */
+.bottom-knobs-row {
+  display: grid;
+  grid-template-columns: 68px 68px 68px 68px;
+}
+
+/* ═══ FOOTER ═══ */
+.footer {
+  background: #2b3d4a;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  position: relative;
+}
+
+.footer-nums { display: flex; align-items: center; gap: 14px; }
+.fnum { font-size: 13px; font-weight: 500; letter-spacing: 0.5px; color: #5e8398; }
+.farrows { display: flex; gap: 5px; margin-left: 2px; }
+.farrow { background: none; border: none; color: #5e8398; font-size: 10px; cursor: pointer; }
+.farrow:hover { color: #8aacbe; }
+
+.footer-preset {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  font-size: 11px; font-weight: 500; letter-spacing: 2.5px; color: #5e8398;
+  text-transform: uppercase; white-space: nowrap;
+}
+
+.footer-decay {
+  margin-left: auto;
+  font-size: 11px; font-weight: 500; letter-spacing: 1.5px; color: #5e8398;
+  text-transform: uppercase;
+}
+
+/* Tooltip */
+#tt {
+  position: fixed; z-index: 999;
+  background: rgba(25,40,52,0.92); color: #8ab8cc;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 10px; letter-spacing: 1px;
+  padding: 2px 7px; border-radius: 3px;
+  pointer-events: none; opacity: 0; transition: opacity 0.1s;
+}
+</style>
+</head>
+<body>
+<div id="tt"></div>
+
+<div class="plugin">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="logo">
+      <svg viewBox="0 0 22 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M11 2C6 2 2 6.5 2 12C2 17.5 5.5 22 11 24C16.5 22 20 17.5 20 12C20 6.5 16 2 11 2Z"
+              stroke="#2e4252" stroke-width="1.4" fill="none"/>
+        <line x1="11" y1="24" x2="11" y2="29" stroke="#2e4252" stroke-width="1.4" stroke-linecap="round"/>
+        <circle cx="11" cy="12" r="3.5" fill="#2e4252" opacity="0.45"/>
+      </svg>
+      <div class="logo-lines">
+        <span class="gn">GHOST NOTE</span>
+        <span class="au">AUDIO</span>
+      </div>
+    </div>
+    <div class="header-title">CLOUDSEED</div>
+  </div>
+
+  <!-- BODY -->
+  <div class="body">
+
+    <!-- TOP CARD -->
+    <div class="top-card">
+
+      <!-- TAPS: 2 cols, 1 button (col 1), 2 knob rows -->
+      <div class="section section-taps">
+        <div class="sec-title">TAPS</div>
+        <div class="sec-grid">
+          <!-- button row: OFF in col1, empty col2 -->
+          <div class="btn-cell"><button class="tbtn off" onclick="togBtn(this)">OFF</button></div>
+          <div class="empty-cell"></div>
+          <!-- knob row 1 -->
+          <div class="knob-cell"><canvas class="kc" data-v="0.30" data-l="COUNT" data-sz="44"></canvas><div class="klabel">COUNT</div></div>
+          <div class="knob-cell"><canvas class="kc" data-v="0.55" data-l="DECAY" data-sz="44"></canvas><div class="klabel">DECAY</div></div>
+          <!-- knob row 2 -->
+          <div class="knob-cell"><canvas class="kc" data-v="0.20" data-l="PRE-DELAY" data-sz="44"></canvas><div class="klabel">PRE-DELAY</div></div>
+          <div class="knob-cell"><canvas class="kc" data-v="0.42" data-l="LENGTH" data-sz="44"></canvas><div class="klabel">LENGTH</div></div>
+        </div>
+      </div>
+
+      <!-- DIFFUSION: 2 cols, 2 buttons aligned to cols -->
+      <div class="section section-diff">
+        <div class="sec-title">DIFFUSION</div>
+        <div class="sec-grid">
+          <!-- button row: ON in col1, 9 in col2 -->
+          <div class="btn-cell"><button class="tbtn on" onclick="togBtn(this)">ON</button></div>
+          <div class="btn-cell"><button class="tbtn on" onclick="togBtn(this)">9</button></div>
+          <!-- knob row 1 -->
+          <div class="knob-cell"><canvas class="kc" data-v="0.35" data-l="DELAY" data-sz="44"></canvas><div class="klabel">DELAY</div></div>
+          <div class="knob-cell"><canvas class="kc" data-v="0.28" data-l="MOD AMT" data-sz="44"></canvas><div class="klabel">MOD AMT</div></div>
+          <!-- knob row 2 -->
+          <div class="knob-cell"><canvas class="kc" data-v="0.50" data-l="FEEDBACK" data-sz="44"></canvas><div class="klabel">FEEDBACK</div></div>
+          <div class="knob-cell"><canvas class="kc" data-v="0.25" data-l="MOD RATE" data-sz="44"></canvas><div class="klabel">MOD RATE</div></div>
+        </div>
+      </div>
+
+      <!-- LATE REFLECTIONS: 4 cols, 4 buttons aligned to cols -->
+      <div class="section section-late">
+        <div class="sec-title">LATE REFLECTIONS</div>
+        <div class="sec-grid">
+          <!-- button row: one per column -->
+          <div class="btn-cell"><button class="tbtn on" onclick="togBtn(this)">POST</button></div>
+          <div class="btn-cell"><button class="tbtn on" onclick="togBtn(this)">12</button></div>
+          <div class="btn-cell"><button class="tbtn on" onclick="togBtn(this)">ON</button></div>
+          <div class="btn-cell"><button class="tbtn on" onclick="togBtn(this)">4</button></div>
+          <!-- knob row 1 -->
+          <div class="knob-cell"><canvas class="kc" data-v="0.65" data-l="SIZE" data-sz="44"></canvas><div class="klabel">SIZE</div></div>
+          <div class="knob-cell"><canvas class="kc" data-v="0.28" data-l="MOD AMT" data-sz="44"></canvas><div class="klabel">MOD AMT</div></div>
+          <div class="knob-cell"><canvas class="kc" data-v="0.45" data-l="DELAY" data-sz="44"></canvas><div class="klabel">DELAY</div></div>
+          <div class="knob-cell"><canvas class="kc" data-v="0.20" data-l="MOD AMT" data-sz="44"></canvas><div class="klabel">MOD AMT</div></div>
+          <!-- knob row 2 -->
+          <div class="knob-cell"><canvas class="kc" data-v="0.85" data-l="DECAY" data-sz="44"></canvas><div class="klabel">DECAY</div></div>
+          <div class="knob-cell"><canvas class="kc" data-v="0.28" data-l="MOD RATE" data-sz="44"></canvas><div class="klabel">MOD RATE</div></div>
+          <div class="knob-cell"><canvas class="kc" data-v="0.55" data-l="FEEDBACK" data-sz="44"></canvas><div class="klabel">FEEDBACK</div></div>
+          <div class="knob-cell"><canvas class="kc" data-v="0.22" data-l="MOD RATE" data-sz="44"></canvas><div class="klabel">MOD RATE</div></div>
+        </div>
+      </div>
+
+      <!-- EQUALISATION: 3 cols, 3 buttons, row1=3 knobs, row2=2 knobs centred -->
+      <div class="section section-eq">
+        <div class="sec-title">EQUALISATION</div>
+        <div class="sec-grid">
+          <!-- button row: one per column -->
+          <div class="btn-cell"><button class="tbtn off" onclick="togBtn(this)">OFF</button></div>
+          <div class="btn-cell"><button class="tbtn off" onclick="togBtn(this)">OFF</button></div>
+          <div class="btn-cell"><button class="tbtn on"  onclick="togBtn(this)">ON</button></div>
+          <!-- knob row 1 -->
+          <div class="knob-cell"><canvas class="kc" data-v="0.28" data-l="LOW FREQ" data-sz="44"></canvas><div class="klabel">LOW FREQ</div></div>
+          <div class="knob-cell"><canvas class="kc" data-v="0.72" data-l="HIGH FREQ" data-sz="44"></canvas><div class="klabel">HIGH FREQ</div></div>
+          <div class="knob-cell"><canvas class="kc" data-v="0.60" data-l="CUTOFF" data-sz="44"></canvas><div class="klabel">CUTOFF</div></div>
+          <!-- row 2: span all 3 cols, center 2 knobs -->
+          <div class="eq-row2-span">
+            <div class="knob-cell" style="width:74px;"><canvas class="kc" data-v="0.45" data-l="LOW GAIN" data-sz="44"></canvas><div class="klabel">LOW GAIN</div></div>
+            <div class="knob-cell" style="width:74px;"><canvas class="kc" data-v="0.38" data-l="HIGH GAIN" data-sz="44"></canvas><div class="klabel">HIGH GAIN</div></div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /top-card -->
+
+    <!-- BOTTOM AREA — centered -->
+    <div class="bottom-area">
+
+      <!-- Faders: DRY EARLY LATE -->
+      <div class="faders-group">
+        <div class="fader-col">
+          <div class="fader-track" id="fdr-dry"><div class="fader-thumb" style="bottom:12px;"></div></div>
+          <div class="fader-label">DRY</div>
+        </div>
+        <div class="fader-col">
+          <div class="fader-track" id="fdr-early"><div class="fader-thumb" style="bottom:20px;"></div></div>
+          <div class="fader-label">EARLY</div>
+        </div>
+        <div class="fader-col">
+          <div class="fader-track" id="fdr-late"><div class="fader-thumb" style="bottom:55px;"></div></div>
+          <div class="fader-label">LATE</div>
+        </div>
+      </div>
+
+      <!-- Right: 3 OFF buttons + 4 knobs below -->
+      <div class="bottom-right">
+        <!-- 3 buttons aligned to first 3 knob columns -->
+        <div class="bottom-btn-row">
+          <div class="bottom-btn-cell"><button class="tbtn off" onclick="togBtn(this)">OFF</button></div>
+          <div class="bottom-btn-cell"><button class="tbtn off" onclick="togBtn(this)">OFF</button></div>
+          <div class="bottom-btn-cell"><button class="tbtn off" onclick="togBtn(this)">OFF</button></div>
+        </div>
+        <!-- 4 knobs -->
+        <div class="bottom-knobs-row">
+          <div class="knob-cell"><canvas class="kc" data-v="0.50" data-l="INPUT MIX"  data-sz="52"></canvas><div class="klabel">INPUT MIX</div></div>
+          <div class="knob-cell"><canvas class="kc" data-v="0.75" data-l="HIGH CUT"   data-sz="52"></canvas><div class="klabel">HIGH CUT</div></div>
+          <div class="knob-cell"><canvas class="kc" data-v="0.15" data-l="LOW CUT"    data-sz="52"></canvas><div class="klabel">LOW CUT</div></div>
+          <div class="knob-cell"><canvas class="kc" data-v="0.35" data-l="CROSS SEED" data-sz="52"></canvas><div class="klabel">CROSS SEED</div></div>
+        </div>
+      </div>
+
+    </div><!-- /bottom-area -->
+
+  </div><!-- /body -->
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div class="footer-nums">
+      <span class="fnum">333</span>
+      <span class="fnum">146</span>
+      <span class="fnum">230</span>
+      <span class="fnum">289</span>
+      <div class="farrows">
+        <button class="farrow">◀</button>
+        <button class="farrow">▶</button>
+      </div>
+    </div>
+    <div class="footer-preset">[FX] DIVINE INSPIRATION</div>
+    <div class="footer-decay">DECAY: 17.3 sec</div>
+  </div>
+
+</div><!-- /plugin -->
+
+<script>
+// ── KNOB ENGINE ──────────────────────────────────────────────
+const SA  = Math.PI * 0.75;
+const EA  = Math.PI * 2.25;
+const ARC = EA - SA;
+const DPR = window.devicePixelRatio || 1;
+
+function drawKnob(c, val) {
+  const sz = c._sz;
+  c.width  = sz * DPR;
+  c.height = sz * DPR;
+  c.style.width  = sz + 'px';
+  c.style.height = sz + 'px';
+
+  const ctx = c.getContext('2d');
+  ctx.scale(DPR, DPR);
+  ctx.clearRect(0, 0, sz, sz);
+
+  const cx = sz / 2, cy = sz / 2, r = sz * 0.36;
+
+  // Shadow + body
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.22)';
+  ctx.shadowBlur  = 4;
+  ctx.shadowOffsetY = 1.5;
+  const g = ctx.createRadialGradient(cx - r*.25, cy - r*.2, r*.05, cx, cy, r);
+  g.addColorStop(0,   '#e2ecf4');
+  g.addColorStop(0.6, '#cad5df');
+  g.addColorStop(1,   '#b5c4cf');
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI*2);
+  ctx.fillStyle = g;
+  ctx.fill();
+  ctx.restore();
+
+  const trackR = r + 5;
+
+  // Arc track bg
+  ctx.beginPath();
+  ctx.arc(cx, cy, trackR, SA, EA);
+  ctx.strokeStyle = 'rgba(80,110,130,0.2)';
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+
+  // Arc fill
+  const va = SA + val * ARC;
+  if (val > 0.005) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, trackR, SA, va);
+    ctx.strokeStyle = '#3b5e77';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+  }
+
+  // Indicator line
+  ctx.beginPath();
+  ctx.moveTo(cx + Math.cos(va) * r * 0.5, cy + Math.sin(va) * r * 0.5);
+  ctx.lineTo(cx + Math.cos(va) * r * 0.88, cy + Math.sin(va) * r * 0.88);
+  ctx.strokeStyle = '#3b5e77';
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+}
+
+let activeK = null, startY = 0, startV = 0;
+
+document.querySelectorAll('.kc').forEach(c => {
+  c._sz  = parseInt(c.dataset.sz || '44');
+  c._val = parseFloat(c.dataset.v || '0.5');
+  drawKnob(c, c._val);
+
+  c.addEventListener('mousedown', e => {
+    activeK = c; startY = e.clientY; startV = c._val;
+    e.preventDefault();
+  });
+  c.addEventListener('wheel', e => {
+    e.preventDefault();
+    c._val = clamp(c._val - e.deltaY * 0.003);
+    drawKnob(c, c._val); showTip(c);
+  }, { passive: false });
+  c.addEventListener('dblclick', () => {
+    c._val = 0.5; drawKnob(c, 0.5);
+  });
+});
+
+document.addEventListener('mousemove', e => {
+  if (!activeK) return;
+  activeK._val = clamp(startV + (startY - e.clientY) / 100);
+  drawKnob(activeK, activeK._val);
+  showTip(activeK);
+});
+document.addEventListener('mouseup', () => { activeK = null; });
+
+// ── TOOLTIP ──────────────────────────────────────────────────
+const tt = document.getElementById('tt');
+let ttT;
+function showTip(c) {
+  const r = c.getBoundingClientRect();
+  tt.textContent = (c.dataset.l || '') + ': ' + Math.round(c._val * 100) + '%';
+  tt.style.left = (r.left + r.width/2 - 28) + 'px';
+  tt.style.top  = (r.top - 22) + 'px';
+  tt.style.opacity = '1';
+  clearTimeout(ttT);
+  ttT = setTimeout(() => tt.style.opacity = '0', 1200);
+}
+
+// ── TOGGLE BUTTONS ───────────────────────────────────────────
+function togBtn(b) {
+  if (b.classList.contains('on')) {
+    b.classList.replace('on', 'off');
+  } else {
+    b.classList.replace('off', 'on');
+  }
+}
+
+// ── FADER INTERACTION ────────────────────────────────────────
+let activeF = null, fSY = 0, fSB = 0;
+
+document.querySelectorAll('.fader-track').forEach(track => {
+  const thumb = track.querySelector('.fader-thumb');
+  track.addEventListener('mousedown', e => {
+    activeF = { track, thumb };
+    fSY = e.clientY;
+    fSB = parseInt(thumb.style.bottom) || 0;
+    e.preventDefault();
+  });
+});
+
+document.addEventListener('mousemove', e => {
+  if (!activeF) return;
+  const { track, thumb } = activeF;
+  const h   = track.clientHeight;
+  const dy  = fSY - e.clientY;
+  const bot = Math.min(h - 8, Math.max(0, fSB + dy));
+  thumb.style.bottom = bot + 'px';
+});
+document.addEventListener('mouseup', () => { activeF = null; });
+
+function clamp(v) { return Math.min(1, Math.max(0, v)); }
+</script>
+</body>
+</html>
