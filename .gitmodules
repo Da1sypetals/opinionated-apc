@@ -1,9 +1,3 @@
-[submodule "_tools/visage"]
-	path = _tools/visage
-	url = https://github.com/VitalAudio/visage
-[submodule "_tools/pluginval"]
-	path = _tools/pluginval
-	url = https://github.com/Tracktion/pluginval
 [submodule "_tools/JUCE"]
 	path = _tools/JUCE
 	url = https://github.com/juce-framework/JUCE
