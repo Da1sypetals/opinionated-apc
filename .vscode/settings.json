@@ -1,0 +1,6 @@
+{
+    "rust-analyzer.linkedProjects": [
+        "rust-dsp-crates/cloudseed/cloudseed-rs/Cargo.toml",
+        "plugins/CloudSeed/dsp/Cargo.toml"
+    ]
+}

@@ -2,6 +2,16 @@
 
 The *opinionated* part is the tech stack, where main DSP code is written in Rust, JUCE C++ code only serves as glue, and the UI remains on the web stack.
 
+If you need to add a rust crate, you will need to add a line that points to `Cargo.toml` in `.vscode/settings.json`:
+
+```json
+{
+    "rust-analyzer.linkedProjects": [
+        "relative/path/to/project/Cargo.toml"
+    ]
+}
+```
+
 ---
 
 Below is the README of the original project
@@ -10,11 +20,6 @@ Below is the README of the original project
 ![Audio Plugin Coder Logo](https://github.com/Noizefield/audio-plugin-coder/blob/main/assets/APC_Logo.gif)
 
 > AI-powered open-source framework for vibe-coding audio plugins from concept to shipped product
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![JUCE](https://img.shields.io/badge/JUCE-8.0-blue.svg)](https://juce.com/)
-[![Platform](https://img.shields.io/badge/Platform-Windows%2011%20%7C%20macOS-0078D4.svg)](https://github.com/Noizefield/audio-plugin-coder)
-[![Sponsor](https://img.shields.io/badge/Sponsor-Project-pink.svg?style=social&logo=heart)](https://github.com/sponsors/Noizefield) 
 
 ## About Audio Plugin Coder 
 
