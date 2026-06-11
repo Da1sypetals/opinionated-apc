@@ -40,8 +40,6 @@ plugins/CloudSeed/
 └── build.py                         build/install/clear/validate CLI tool
 ```
 
-Production `index.html` contains everything inline: CSS in `<style>`, JUCE frontend library and UI logic in a single `<script>` block. No external JS/CSS files. See pitfall #6 below for why.
-
 ---
 
 ## Rust FFI Crate
@@ -337,15 +335,11 @@ Problem: Two files named `index.js` in different directories (`js/index.js` and 
 
 Solution: In the resource provider, map URL paths explicitly to the correct BinaryData symbols. Better solution: inline everything into `index.html` so only one file is embedded. This eliminates the mangling issue entirely.
 
-### 6. ES6 modules fail silently in JUCE WebView
+### 6. ES6 modules: platform-dependent behavior
 
-Problem: `<script type="module" src="js/index.js">` fails silently in JUCE's WebView (WKWebView on macOS, WebView2 on Windows). The UI loads but shows no interactivity — knobs render as static dots, toggles do not respond, no JS errors are visible.
+The WEBVIEW-PRODUCTION-GUIDE in this repo states "ES6 modules DO NOT WORK in WebView". This is a Windows-specific issue (WebView2 + custom URL scheme CORS). On macOS with WKWebView, ES6 `<script type="module">` and `import` statements work correctly. CloudWash ships with separate JS files using ES6 modules on macOS.
 
-This is because JUCE's resource provider serves files via a custom URL scheme (`juce://juce.backend/`). ES6 module loading requires CORS headers that the resource provider does not set. The `import` statements fail with CORS errors that are swallowed silently.
-
-Solution: ALL JavaScript must be inlined in `index.html` within a plain `<script>` block (not `<script type="module">`). The JUCE frontend library (SliderState, ToggleState, etc.) must be reimplemented or copied inline using ES5-compatible syntax (function constructors, not ES6 classes). All CSS must also be inline in `<style>`.
-
-The production `index.html` should be a single self-contained file with zero external dependencies. The `js/` directory can remain for reference/development but is not loaded by the plugin.
+Conclusion: on macOS-only builds, splitting JS/CSS into separate files with ES6 modules is safe and works. Inlining is only required for cross-platform builds targeting Windows.
 
 ### 7. BusesProperties default determines AU channel visibility
 
@@ -369,6 +363,33 @@ Solution: Do not use `JucePlugin_PreferredChannelConfigurations`. Use `BusesProp
 Problem: Setting `overflow: hidden` on section panels causes knobs and toggles at the bottom of a panel to be invisible. Combined with fixed-height grid rows (`grid-template-rows: 1fr 1fr`), this makes it appear as if UI elements are missing, with no visible error.
 
 Solution: Use `overflow: visible` on panels. Use `grid-template-rows: auto auto` instead of `1fr 1fr` so rows size to their content. Set `min-height` instead of `height` on the body and container so the page can grow if needed.
+
+### 10. macOS WKWebView resource provider URL format
+
+Problem: On macOS, WKWebView sends resource requests as bare relative paths (`/css/style.css`, `/js/index.js`) instead of full custom-scheme URLs (`juce://juce.backend/css/style.css`). The commonly used pattern `url.fromFirstOccurrenceOf(getResourceProviderRoot(), ...)` fails because the URL does not contain the root prefix. It returns an empty string, causing all resource requests to fallback to `index.html`. The result is that CSS and JS files are not loaded — the UI appears as unstyled plain text with no interactivity.
+
+This is a macOS-specific issue. On Windows, WebView2 sends full URLs with the `https://juce.backend/` prefix.
+
+Diagnosis: Add `fprintf(stderr, ...)` logging in the resource provider to print the raw URL and the result of `fromFirstOccurrenceOf`. In Release builds, JUCE's `DBG()` macro is stripped, so use `fprintf(stderr, ...)` for debugging.
+
+Solution: Do not rely on `fromFirstOccurrenceOf`. Instead, check whether the URL starts with the root prefix and handle both cases:
+
+```cpp
+auto root = juce::WebBrowserComponent::getResourceProviderRoot();
+juce::String path;
+if (url.startsWith(root))
+    path = url.substring(root.length());
+else
+    path = url;
+if (path.startsWith("/"))
+    path = path.substring(1);
+if (path.isEmpty())
+    path = "index.html";
+```
+
+This handles both macOS (bare `/css/style.css`) and Windows (`https://juce.backend/css/style.css`).
+
+Note: CloudWash avoids this issue because its HTML loads JS via `<script type="module" src="js/index.js">`. WKWebView's ES6 module loader resolves import URLs through a different code path that does include the full scheme prefix. But `<link rel="stylesheet">` and non-module `<script src>` use bare relative paths on macOS.
 
 ---
 

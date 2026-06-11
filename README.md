@@ -1,3 +1,11 @@
+# Opinionated Audio Plugin Coder (OAPC)
+
+The *opinionated* part is the tech stack, where main DSP code is written in Rust, JUCE C++ code only serves as glue, and the UI remains on the web stack.
+
+---
+
+Below is the README of the original project
+
 # Audio Plugin Coder (APC)
 ![Audio Plugin Coder Logo](https://github.com/Noizefield/audio-plugin-coder/blob/main/assets/APC_Logo.gif)
 
