@@ -28,3 +28,13 @@
 
 阅读README，你应该可以看到我现在已经把整个项目的技术栈从C++ 换成了Rust加C++。然后你可以看到Git log里面有若干条Commit message是以trim修剪开头的提交，删除了一些没有用的框架代码和文档。
 但是我怀疑那些框架代码和文档里面有一些可以复用的经验，你可以帮我找一下吗？先不要写代码或者文件，先讨论一下
+
+---
+
+阅读 [CloudSeed](plugins/CloudSeed/) 的代码，这是我们插件架构的参考；然后阅读UI设计稿 [debess.html](design-gallery/debess/debess.html) ；然后完成任务：
+- 将DeBess DSP [DeBess](airwindows/plugins/MacAU/DeBess/) word-for-word 移植到Rust；
+- 在 [plugins](plugins/) 目录下实现DeBes AUv2插件，使用和CloudSeed一样的架构。
+注意音频插件的一切设计要求；注意correctly animate UI.
+[agent-workflow.md](rust-auv2-docs/agent-workflow.md) 遵守代码要求，不允许在C++代码写任何逻辑，包括任何atomic等逻辑，C++仅是一层纯粹的胶水，一切逻辑都在Rust代码里面实现。如果需要的话，rust的代码是可以分mod的。
+
+我希望你先认真思考一下，频谱图等那两个图要怎么画，我们需要以复用的标准来实现这两个UI界面，因为我希望后续就不要重新实现了。

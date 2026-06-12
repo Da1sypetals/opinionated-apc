@@ -1,4 +1,4 @@
-# CloudSeed - Algorithmic Reverb (Rust DSP + WebView UI)
+# DeBess - De-esser (Rust DSP + WebView UI)
 # macOS AU-only build
 
 cmake_minimum_required(VERSION 3.22)
@@ -6,14 +6,6 @@ cmake_minimum_required(VERSION 3.22)
 # ============================================
 # RUST DSP 引擎（通过 Corrosion 集成）
 # ============================================
-include(FetchContent)
-FetchContent_Declare(
-    Corrosion
-    GIT_REPOSITORY https://github.com/corrosion-rs/corrosion.git
-    GIT_TAG v0.5.1
-)
-FetchContent_MakeAvailable(Corrosion)
-
 corrosion_import_crate(MANIFEST_PATH dsp/Cargo.toml)
 
 # ============================================
@@ -23,21 +15,24 @@ if(APPLE)
     set(PLUGIN_FORMATS AU Standalone)
     set(AU_MAIN_TYPE kAudioUnitType_Effect)
 else()
-    message(FATAL_ERROR "CloudSeed: Only macOS AU builds are supported")
+    message(FATAL_ERROR "DeBess: Only macOS AU builds are supported")
 endif()
 
-message(STATUS "CloudSeed: Building for ${PLUGIN_FORMATS}")
+message(STATUS "DeBess: Building for ${PLUGIN_FORMATS}")
 
 # ============================================
 # Web UI 资源（嵌入为 BinaryData）
 # ============================================
-juce_add_binary_data(CloudSeed_WebUI
+juce_add_binary_data(DeBess_WebUI
     SOURCES
         Source/ui/public/index.html
         Source/ui/public/css/style.css
         Source/ui/public/js/index.js
         Source/ui/public/js/knob.js
         Source/ui/public/js/format.js
+        Source/ui/public/js/viz/spectrum.js
+        Source/ui/public/js/viz/timeline.js
+        Source/ui/public/js/viz/meter.js
         Source/ui/public/js/juce/index.js
         Source/ui/public/js/juce/check_native_interop.js
 )
@@ -45,19 +40,19 @@ juce_add_binary_data(CloudSeed_WebUI
 # ============================================
 # 插件定义
 # ============================================
-juce_add_plugin(CloudSeed
+juce_add_plugin(DeBess
     COMPANY_NAME "Da1sypetals"
-    PLUGIN_MANUFACTURER_CODE Nfld
-    PLUGIN_CODE CSed
+    PLUGIN_MANUFACTURER_CODE Awin
+    PLUGIN_CODE DBss
     FORMATS ${PLUGIN_FORMATS}
-    PRODUCT_NAME "CloudSeed"
+    PRODUCT_NAME "DeBess"
     AU_MAIN_TYPE ${AU_MAIN_TYPE}
 )
 
 # ============================================
 # 源文件
 # ============================================
-target_sources(CloudSeed
+target_sources(DeBess
     PRIVATE
         Source/PluginProcessor.cpp
         Source/PluginEditor.cpp
@@ -66,10 +61,10 @@ target_sources(CloudSeed
 # ============================================
 # 链接库
 # ============================================
-target_link_libraries(CloudSeed
+target_link_libraries(DeBess
     PRIVATE
-        CloudSeed_WebUI
-        cloudseed_ffi
+        DeBess_WebUI
+        debess_ffi
         juce::juce_audio_basics
         juce::juce_audio_devices
         juce::juce_audio_formats
@@ -91,7 +86,7 @@ target_link_libraries(CloudSeed
 # ============================================
 # 编译定义
 # ============================================
-target_compile_definitions(CloudSeed
+target_compile_definitions(DeBess
     PUBLIC
         JUCE_WEB_BROWSER=1
         JUCE_VST3_CAN_REPLACE_VST2=0
