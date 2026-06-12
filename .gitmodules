@@ -1,3 +1,6 @@
 [submodule "_tools/JUCE"]
 	path = _tools/JUCE
 	url = https://github.com/juce-framework/JUCE
+[submodule "rust-dsp-crates/cloudseed/cloudseed-rs"]
+	path = rust-dsp-crates/cloudseed/cloudseed-rs
+	url = git@github.com:blossom-slopware/cloudseed-reverb-rs.git
