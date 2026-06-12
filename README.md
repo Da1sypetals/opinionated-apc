@@ -3,7 +3,7 @@
 This repo is a fork of [APC](https://github.com/Noizefield/audio-plugin-coder).
 
 The *opinionated* part is:
-- Tech stack, where main DSP code is written in Rust, JUCE C++ code only serves as glue, and the UI remains on the web stack, which is tailored for myseld: I have no ability to audio (modern) C++ code, and I would like LLM write 
+- Tech stack, where main DSP code is written in Rust, JUCE C++ code only serves as glue, and the UI remains on the web stack, which is tailored for myself: I have no ability to audit (modern) C++ code, and I would like LLM write UI code for me.
 - Target, we only care about building AUv2 Logic Pro plugin.
 
 If you need to add a rust crate, you will need to add a line that points to `Cargo.toml` in `.vscode/settings.json`:
@@ -15,3 +15,9 @@ If you need to add a rust crate, you will need to add a line that points to `Car
     ]
 }
 ```
+
+## Single Source of Truth
+
+We avoid creating excessive documents.
+
+Agent shall refer to plugins/CloudSeed directly for the project structure.
