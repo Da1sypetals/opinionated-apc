@@ -2,10 +2,15 @@
 //
 // 与任意插件无关：构造时传入 canvas 与配置，外部通过 setSeries(key, dbArray)
 // 持续喂入各路 dB 数组，组件按对数频率轴 + dB 轴渲染网格与曲线。
-// 可定义任意条 series（line 或 fill），并可声明一对 series 之间的差异填充
-// （例如输入/输出之间的 reduction 区域）。
 //
-// 数据约定：每路 series 是一个长度为 binCount 的 dB 数组（如 -90..0）。
+// 显示质感（参考 FabFilter Pro-Q 等商业分析仪）：
+//   - 对数频率轴 + 后端恒定 Q 式 bin 能量聚合（数据侧已做）
+//   - 频谱倾斜补偿（数据侧已做）使曲线自然填满画面
+//   - 时域弹道：快起慢落（peak-with-decay），消除逐帧抖动
+//   - 平滑曲线（二次贝塞尔中点插值）+ 垂直渐变填充 + 高亮顶线
+//   - 十倍频程网格 + 频率/dB 标注
+//
+// 数据约定：每路 series 是一个长度为 binCount 的 dB 数组。
 // bin 在对数频率轴上等距分布（与后端的对数 bin 映射一致）。
 
 const DPR = window.devicePixelRatio || 1;
@@ -17,39 +22,53 @@ export class SpectrumAnalyzer {
 
         this.fMin = opts.fMin ?? 20;
         this.fMax = opts.fMax ?? 20000;
-        this.dbMin = opts.dbMin ?? -72;
+        this.dbMin = opts.dbMin ?? -90;
         this.dbMax = opts.dbMax ?? 6;
-        this.binCount = opts.binCount ?? 128;
-        this.padTop = opts.padTop ?? 0.08;
-        this.padBottom = opts.padBottom ?? 0.12;
+        this.binCount = opts.binCount ?? 192;
+        this.padTop = opts.padTop ?? 0.06;
+        this.padBottom = opts.padBottom ?? 0.13;
 
-        this.gridColor = opts.gridColor ?? 'rgba(50,80,100,0.12)';
-        this.labelColor = opts.labelColor ?? '#2a4050';
-        this.font = opts.font ?? '500 8px Rajdhani, sans-serif';
+        this.gridColor = opts.gridColor ?? 'rgba(70,110,135,0.10)';
+        this.gridColorMajor = opts.gridColorMajor ?? 'rgba(90,150,180,0.22)';
+        this.labelColor = opts.labelColor ?? 'rgba(120,170,200,0.55)';
+        this.font = opts.font ?? '500 9px Rajdhani, sans-serif';
 
-        // 频率/分贝刻度
-        this.freqTicks = opts.freqTicks ?? [100, 1000, 10000];
-        this.freqTickLabels = opts.freqTickLabels ?? ['100', '1k', '10k'];
-        this.dbTicks = opts.dbTicks ?? [0, -24, -48];
+        // 时域弹道：瞬时起、按 dB/秒 缓慢回落
+        this.releaseDbPerSec = opts.releaseDbPerSec ?? 24;
 
-        // series 定义：{ key, color, lineWidth, fillTo(底部基线/'floor') }
+        // 频率网格线（Hz）。主刻度带标签
+        this.freqLines = opts.freqLines ?? [
+            20, 30, 40, 50, 60, 80, 100, 200, 300, 400, 500, 600, 800,
+            1000, 2000, 3000, 4000, 5000, 6000, 8000, 10000, 20000,
+        ];
+        this.freqLabels = opts.freqLabels ?? {
+            20: '20', 100: '100', 1000: '1k', 10000: '10k', 20000: '20k',
+        };
+        // dB 横线步长
+        this.dbStep = opts.dbStep ?? 12;
+
+        // series 定义：{ key, color, lineWidth, fill(bool), fillColor/fillTopColor/fillBottomColor }
         this.series = opts.series ?? [];
         // 差异填充：{ from, to, color } 在两路 series 之间填充
         this.diffFill = opts.diffFill ?? null;
 
-        this.data = new Map(); // key -> Float32Array(dB)
+        this.data = new Map(); // key -> 目标 dB（来自后端）
+        this.disp = new Map(); // key -> 显示 dB（弹道平滑后）
         for (const s of this.series) {
             this.data.set(s.key, new Float32Array(this.binCount).fill(this.dbMin));
+            this.disp.set(s.key, new Float32Array(this.binCount).fill(this.dbMin));
         }
 
         this._running = false;
         this._raf = null;
+        this._lastT = 0;
         this._render = this._render.bind(this);
     }
 
     setSeries(key, dbArray) {
         if (!this.data.has(key)) {
             this.data.set(key, new Float32Array(this.binCount).fill(this.dbMin));
+            this.disp.set(key, new Float32Array(this.binCount).fill(this.dbMin));
         }
         const dst = this.data.get(key);
         const n = Math.min(dbArray.length, this.binCount);
@@ -59,6 +78,7 @@ export class SpectrumAnalyzer {
     start() {
         if (this._running) return;
         this._running = true;
+        this._lastT = performance.now();
         this._raf = requestAnimationFrame(this._render);
     }
 
@@ -101,8 +121,44 @@ export class SpectrumAnalyzer {
         return { w, h };
     }
 
-    _render() {
+    // 弹道：瞬时起、缓慢落
+    _advance(dt) {
+        const fall = this.releaseDbPerSec * dt;
+        for (const s of this.series) {
+            const target = this.data.get(s.key);
+            const cur = this.disp.get(s.key);
+            for (let i = 0; i < this.binCount; i++) {
+                const t = target[i];
+                if (t >= cur[i]) cur[i] = t;
+                else cur[i] = Math.max(t, cur[i] - fall);
+            }
+        }
+    }
+
+    // 用二次贝塞尔中点插值生成平滑路径（不含 begin/close）
+    _tracePath(ctx, arr, w, h) {
+        const n = this.binCount;
+        let px = this._binToX(0, w);
+        let py = this._dbToY(arr[0], h);
+        ctx.moveTo(px, py);
+        for (let i = 1; i < n - 1; i++) {
+            const x = this._binToX(i, w);
+            const y = this._dbToY(arr[i], h);
+            const nx = this._binToX(i + 1, w);
+            const ny = this._dbToY(arr[i + 1], h);
+            const xc = (x + nx) / 2;
+            const yc = (y + ny) / 2;
+            ctx.quadraticCurveTo(x, y, xc, yc);
+        }
+        ctx.lineTo(this._binToX(n - 1, w), this._dbToY(arr[n - 1], h));
+    }
+
+    _render(now) {
         if (!this._running) return;
+        const dt = Math.min(0.1, (now - this._lastT) / 1000 || 0);
+        this._lastT = now;
+        this._advance(dt);
+
         const { w, h } = this._resize();
         const ctx = this.ctx;
         ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -110,22 +166,15 @@ export class SpectrumAnalyzer {
 
         this._drawGrid(w, h);
 
-        // 差异填充（如 reduction 区域）
+        // 差异填充（如 reduction 区域）：input 与 output 之间
         if (this.diffFill) {
-            const a = this.data.get(this.diffFill.from);
-            const b = this.data.get(this.diffFill.to);
+            const a = this.disp.get(this.diffFill.from);
+            const b = this.disp.get(this.diffFill.to);
             if (a && b) {
                 ctx.beginPath();
-                for (let i = 0; i < this.binCount; i++) {
-                    const x = this._binToX(i, w);
-                    const y = this._dbToY(a[i], h);
-                    if (i === 0) ctx.moveTo(x, y);
-                    else ctx.lineTo(x, y);
-                }
+                this._tracePath(ctx, a, w, h);
                 for (let i = this.binCount - 1; i >= 0; i--) {
-                    const x = this._binToX(i, w);
-                    const y = this._dbToY(b[i], h);
-                    ctx.lineTo(x, y);
+                    ctx.lineTo(this._binToX(i, w), this._dbToY(b[i], h));
                 }
                 ctx.closePath();
                 ctx.fillStyle = this.diffFill.color;
@@ -134,33 +183,35 @@ export class SpectrumAnalyzer {
         }
 
         // 各路 series
+        const floorY = this._dbToY(this.dbMin, h);
         for (const s of this.series) {
-            const arr = this.data.get(s.key);
+            const arr = this.disp.get(s.key);
             if (!arr) continue;
 
-            if (s.fillTo !== undefined) {
-                const baseY = s.fillTo === 'floor' ? this._dbToY(this.dbMin, h) : this._dbToY(s.fillTo, h);
+            if (s.fill) {
                 ctx.beginPath();
-                ctx.moveTo(0, baseY);
-                for (let i = 0; i < this.binCount; i++) {
-                    ctx.lineTo(this._binToX(i, w), this._dbToY(arr[i], h));
-                }
-                ctx.lineTo(w, baseY);
+                ctx.moveTo(this._binToX(0, w), floorY);
+                ctx.lineTo(this._binToX(0, w), this._dbToY(arr[0], h));
+                this._tracePath(ctx, arr, w, h);
+                ctx.lineTo(this._binToX(this.binCount - 1, w), floorY);
                 ctx.closePath();
-                ctx.fillStyle = s.fillColor ?? s.color;
+                if (s.fillTopColor && s.fillBottomColor) {
+                    const g = ctx.createLinearGradient(0, h * this.padTop, 0, floorY);
+                    g.addColorStop(0, s.fillTopColor);
+                    g.addColorStop(1, s.fillBottomColor);
+                    ctx.fillStyle = g;
+                } else {
+                    ctx.fillStyle = s.fillColor ?? s.color;
+                }
                 ctx.fill();
             }
 
             ctx.beginPath();
-            for (let i = 0; i < this.binCount; i++) {
-                const x = this._binToX(i, w);
-                const y = this._dbToY(arr[i], h);
-                if (i === 0) ctx.moveTo(x, y);
-                else ctx.lineTo(x, y);
-            }
+            this._tracePath(ctx, arr, w, h);
             ctx.strokeStyle = s.color;
             ctx.lineWidth = s.lineWidth ?? 1.5;
             ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
             ctx.stroke();
         }
 
@@ -169,31 +220,37 @@ export class SpectrumAnalyzer {
 
     _drawGrid(w, h) {
         const ctx = this.ctx;
-        ctx.strokeStyle = this.gridColor;
-        ctx.lineWidth = 1;
         ctx.font = this.font;
-        ctx.fillStyle = this.labelColor;
+        ctx.lineWidth = 1;
 
         // 频率竖线
-        for (let i = 0; i < this.freqTicks.length; i++) {
-            const x = this._freqToX(this.freqTicks[i], w);
+        for (const f of this.freqLines) {
+            if (f < this.fMin || f > this.fMax) continue;
+            const x = this._freqToX(f, w);
+            const label = this.freqLabels[f];
+            ctx.strokeStyle = label ? this.gridColorMajor : this.gridColor;
             ctx.beginPath();
             ctx.moveTo(x, 0);
-            ctx.lineTo(x, h);
+            ctx.lineTo(x, h - h * this.padBottom * 0.55);
             ctx.stroke();
-            ctx.textAlign = 'center';
-            ctx.fillText(this.freqTickLabels[i], x, h - 3);
+            if (label) {
+                ctx.fillStyle = this.labelColor;
+                ctx.textAlign = 'center';
+                ctx.fillText(label, x, h - 3);
+            }
         }
 
         // dB 横线
         ctx.textAlign = 'left';
-        for (const db of this.dbTicks) {
+        for (let db = this.dbMax; db >= this.dbMin; db -= this.dbStep) {
             const y = this._dbToY(db, h);
+            ctx.strokeStyle = db === 0 ? this.gridColorMajor : this.gridColor;
             ctx.beginPath();
             ctx.moveTo(0, y);
             ctx.lineTo(w, y);
             ctx.stroke();
-            ctx.fillText(db + '', 3, y - 2);
+            ctx.fillStyle = this.labelColor;
+            ctx.fillText((db > 0 ? '+' : '') + db, 3, y - 2);
         }
     }
 }

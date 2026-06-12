@@ -84,6 +84,38 @@ mod tests {
         }
     }
 
+    // output 频谱由 input 经去齿音滤波器频响推导，每个 bin 都不应高于 input（去齿音只衰减）
+    #[test]
+    fn test_output_never_exceeds_input() {
+        let mut ctrl = DeBessController::new(48000);
+        ctrl.set_parameter(parameter::INTENSITY, 0.9);
+        ctrl.set_parameter(parameter::SHARPNESS, 0.5);
+        ctrl.set_parameter(parameter::FILTER, 0.3);
+
+        let n = 4096;
+        // 含强高频成分的复合信号，触发去齿音
+        let input: Vec<f32> = (0..n)
+            .map(|i| {
+                let t = i as f32;
+                0.4 * (t * 0.05).sin() + 0.4 * (t * 1.6).sin()
+            })
+            .collect();
+        let mut out_l = vec![0.0f32; n];
+        let mut out_r = vec![0.0f32; n];
+        ctrl.process(&input, &input, &mut out_l, &mut out_r, n);
+
+        let frame = ctrl.viz_snapshot().read();
+        for b in 0..SPECTRUM_BINS {
+            // 容许极小浮点误差
+            assert!(
+                frame.output_db[b] <= frame.input_db[b] + 1e-3,
+                "bin {b}: output {} > input {}",
+                frame.output_db[b],
+                frame.input_db[b]
+            );
+        }
+    }
+
     // Sense Mon 模式：输出应为 dry - processed
     #[test]
     fn test_sense_monitoring_runs() {

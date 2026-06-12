@@ -5,15 +5,20 @@ use realfft::{RealFftPlanner, RealToComplex};
 use std::sync::Arc;
 
 // 频谱显示的对数频率 bin 数量（喂给 UI 的数据量）
-pub const SPECTRUM_BINS: usize = 128;
+pub const SPECTRUM_BINS: usize = 192;
 // 分析 FFT 大小
-const FFT_SIZE: usize = 2048;
+const FFT_SIZE: usize = 4096;
 // 每多少样本触发一次 FFT（hop）
-const HOP: usize = 1024;
+const HOP: usize = 512;
 
 const F_MIN: f64 = 20.0;
 const F_MAX: f64 = 20000.0;
-const DB_FLOOR: f32 = -90.0;
+const DB_FLOOR: f32 = -96.0;
+
+// 频谱倾斜：绕 1 kHz 以指定斜率抬高高频/压低低频，使典型音乐/粉噪看起来自然填满画面
+// （与 FabFilter Pro-Q 默认 4.5 dB/oct 一致）
+const TILT_DB_PER_OCT: f32 = 4.5;
+const TILT_PIVOT_HZ: f64 = 1000.0;
 
 // UI 一帧可视化数据，布局为 #[repr(C)] 以便快照按值拷贝
 #[derive(Clone, Copy)]
@@ -86,9 +91,8 @@ pub struct VizAnalyzer {
     sample_rate: f64,
     fft: Arc<dyn RealToComplex<f32>>,
     window: Vec<f32>,
-    // 输入/输出环形缓冲，长度 FFT_SIZE
+    // 输入环形缓冲，长度 FFT_SIZE（output 频谱由 input + 滤波器频响推导，无需单独缓冲）
     in_buf: Vec<f32>,
-    out_buf: Vec<f32>,
     write_pos: usize,
     samples_since_fft: usize,
     // FFT 工作内存
@@ -97,8 +101,13 @@ pub struct VizAnalyzer {
     // 当前帧（音频线程维护，发布到 snapshot）
     frame: VizFrame,
     snapshot: VizSnapshot,
-    // 每个 bin 对应的 FFT bin 索引（对数映射，预计算）
-    bin_index: Vec<usize>,
+    // 每个显示频段聚合的 FFT bin 区间 [lo, hi)（对数映射，预计算）
+    band_lo: Vec<usize>,
+    band_hi: Vec<usize>,
+    // 每个显示频段的中心频率（Hz，预计算，用于推导去齿音滤波器频响）
+    band_center: Vec<f64>,
+    // 每个显示频段的倾斜补偿量（dB，预计算）
+    band_tilt: Vec<f32>,
 }
 
 impl VizAnalyzer {
@@ -123,28 +132,29 @@ impl VizAnalyzer {
             fft,
             window,
             in_buf: vec![0.0; FFT_SIZE],
-            out_buf: vec![0.0; FFT_SIZE],
             write_pos: 0,
             samples_since_fft: 0,
             scratch_in,
             spectrum,
             frame: VizFrame::silent(),
             snapshot: VizSnapshot::new(),
-            bin_index: vec![0; SPECTRUM_BINS],
+            band_lo: vec![0; SPECTRUM_BINS],
+            band_hi: vec![0; SPECTRUM_BINS],
+            band_center: vec![0.0; SPECTRUM_BINS],
+            band_tilt: vec![0.0; SPECTRUM_BINS],
         };
-        analyzer.recompute_bin_index();
+        analyzer.recompute_bands();
         analyzer
     }
 
     pub fn set_sample_rate(&mut self, sample_rate: i32) {
         self.sample_rate = sample_rate as f64;
-        self.recompute_bin_index();
+        self.recompute_bands();
         self.reset();
     }
 
     pub fn reset(&mut self) {
         self.in_buf.iter_mut().for_each(|x| *x = 0.0);
-        self.out_buf.iter_mut().for_each(|x| *x = 0.0);
         self.write_pos = 0;
         self.samples_since_fft = 0;
         self.frame = VizFrame::silent();
@@ -155,27 +165,59 @@ impl VizAnalyzer {
         &self.snapshot
     }
 
-    // 把对数频率 bin 映射到 FFT bin 索引
-    fn recompute_bin_index(&mut self) {
+    // 为每个对数频率显示频段预计算：聚合的 FFT bin 区间 [lo, hi) 以及倾斜补偿
+    fn recompute_bands(&mut self) {
         let nyquist = self.sample_rate * 0.5;
         let f_max = F_MAX.min(nyquist);
         let bin_hz = self.sample_rate / FFT_SIZE as f64;
+        let last = (SPECTRUM_BINS - 1) as f64;
+        // 相邻显示频段中心的频率比，用于取频段边界（对数中点）
+        let ratio = (f_max / F_MIN).powf(1.0 / last);
+        let half_step = ratio.sqrt();
+        let max_idx = FFT_SIZE / 2;
+
         for b in 0..SPECTRUM_BINS {
-            let t = b as f64 / (SPECTRUM_BINS - 1) as f64;
-            let freq = F_MIN * (f_max / F_MIN).powf(t);
-            let mut idx = (freq / bin_hz).round() as usize;
-            if idx < 1 {
-                idx = 1;
+            let t = b as f64 / last;
+            let f_center = F_MIN * (f_max / F_MIN).powf(t);
+            let f_lo = f_center / half_step;
+            let f_hi = f_center * half_step;
+
+            let mut lo = (f_lo / bin_hz).floor() as i64;
+            let mut hi = (f_hi / bin_hz).ceil() as i64;
+            if lo < 1 {
+                lo = 1;
             }
-            if idx >= FFT_SIZE / 2 {
-                idx = FFT_SIZE / 2 - 1;
+            if hi <= lo {
+                hi = lo + 1;
             }
-            self.bin_index[b] = idx;
+            if hi > max_idx as i64 {
+                hi = max_idx as i64;
+            }
+            if lo >= hi {
+                lo = hi - 1;
+            }
+            self.band_lo[b] = lo as usize;
+            self.band_hi[b] = hi as usize;
+            self.band_center[b] = f_center;
+
+            // 倾斜：绕 TILT_PIVOT_HZ，每倍频程 TILT_DB_PER_OCT
+            let octaves = (f_center / TILT_PIVOT_HZ).log2() as f32;
+            self.band_tilt[b] = TILT_DB_PER_OCT * octaves;
         }
     }
 
-    // 音频线程每个 block 调用：传入本 block 的输入/输出（单声道分析信号）
-    pub fn feed(&mut self, input: &[f32], output: &[f32]) {
+    // 音频线程每个 block 调用：传入本 block 的输入/输出（单声道分析信号），
+    // 以及当前去齿音 ratio、低通系数（FILTER）与监听模式。
+    // input 频谱实测；output 频谱由 input 频谱乘以去齿音滤波器的真实频响推导得到，
+    // 因此 output 在每个频率上都 <= input（监听模式下为被移除的成分），两条曲线天然不交叉。
+    pub fn feed(
+        &mut self,
+        input: &[f32],
+        output: &[f32],
+        ratio: f64,
+        iir_amount: f64,
+        monitoring: i32,
+    ) {
         let n = input.len();
 
         // block 级 GR 与电平测量
@@ -192,14 +234,16 @@ impl VizAnalyzer {
             out_peak = out_peak.max(xo.abs());
 
             self.in_buf[self.write_pos] = xi;
-            self.out_buf[self.write_pos] = xo;
             self.write_pos = (self.write_pos + 1) % FFT_SIZE;
             self.samples_since_fft += 1;
             if self.samples_since_fft >= HOP {
                 self.samples_since_fft = 0;
-                self.compute_fft();
+                self.compute_input_spectrum();
             }
         }
+
+        // 由 input 频谱 + 去齿音滤波器频响推导 output 频谱
+        self.derive_output_spectrum(ratio, iir_amount, monitoring);
 
         if n > 0 {
             let in_rms = (in_sq / n as f64).sqrt();
@@ -221,42 +265,76 @@ impl VizAnalyzer {
         self.snapshot.write(&self.frame);
     }
 
-    fn compute_fft(&mut self) {
-        // 从环形缓冲按时间顺序取 FFT_SIZE 个样本并加窗，分别处理输入/输出
-        self.fill_spectrum_for(true);
-        self.fill_spectrum_for(false);
-    }
-
-    fn fill_spectrum_for(&mut self, is_input: bool) {
+    fn compute_input_spectrum(&mut self) {
         for i in 0..FFT_SIZE {
             let pos = (self.write_pos + i) % FFT_SIZE;
-            let sample = if is_input {
-                self.in_buf[pos]
-            } else {
-                self.out_buf[pos]
-            };
-            self.scratch_in[i] = sample * self.window[i];
+            self.scratch_in[i] = self.in_buf[pos] * self.window[i];
         }
         self.fft
             .process(&mut self.scratch_in, &mut self.spectrum)
             .unwrap();
 
-        let norm = 2.0 / FFT_SIZE as f32;
+        // 幅度归一化：单频满量程正弦 → 约 0 dB（与加窗补偿合并到 CAL）
+        let amp_norm = 2.0 / FFT_SIZE as f32;
+        // 功率域偏移：10log10(P) + CAL == 20log10(sqrt(P)*amp_norm)
+        let cal = 20.0 * amp_norm.log10();
+
         for b in 0..SPECTRUM_BINS {
-            let idx = self.bin_index[b];
-            let c = self.spectrum[idx];
-            let mag = (c.re * c.re + c.im * c.im).sqrt() * norm;
-            let db = if mag > 1e-9 {
-                20.0 * mag.log10()
+            let lo = self.band_lo[b];
+            let hi = self.band_hi[b];
+            // 聚合频段内所有 FFT bin 的功率（均值），既正确反映高频能量也消除挑单根 bin 的尖刺
+            let mut power_sum = 0.0f32;
+            for idx in lo..hi {
+                let c = self.spectrum[idx];
+                power_sum += c.re * c.re + c.im * c.im;
+            }
+            let count = (hi - lo).max(1) as f32;
+            let mean_power = power_sum / count;
+            let db = if mean_power > 1e-20 {
+                10.0 * mean_power.log10() + cal + self.band_tilt[b]
             } else {
                 DB_FLOOR
             };
-            let db = db.max(DB_FLOOR);
-            if is_input {
-                self.frame.input_db[b] = db;
+            self.frame.input_db[b] = db.max(DB_FLOOR);
+        }
+    }
+
+    // 由 input 频谱推导 output 频谱：output(f) = input(f) * |H(f)|
+    // 去齿音逐样本处理为 out = iir + (in - iir)/ratio，iir 是 in 的一阶低通（系数 = iir_amount）。
+    // 其传递函数 H(z) = LP(z)*(1 - 1/ratio) + 1/ratio，可证 |H(f)| <= 1 恒成立。
+    // 监听模式下显示被移除成分，增益为 |1 - H(f)|。
+    fn derive_output_spectrum(&mut self, ratio: f64, iir_amount: f64, monitoring: i32) {
+        let a = iir_amount.clamp(0.0, 1.0);
+        let inv_ratio = (1.0 / ratio.max(1.0)).clamp(0.0, 1.0);
+        let one_minus_a = 1.0 - a;
+
+        for b in 0..SPECTRUM_BINS {
+            let omega = 2.0 * std::f64::consts::PI * self.band_center[b] / self.sample_rate;
+            let cos_w = omega.cos();
+            let sin_w = omega.sin();
+
+            // LP(ω) = a / (1 - (1-a) e^{-jω})
+            let denom_re = 1.0 - one_minus_a * cos_w;
+            let denom_im = one_minus_a * sin_w;
+            let denom_mag2 = denom_re * denom_re + denom_im * denom_im;
+            let lp_re = a * denom_re / denom_mag2;
+            let lp_im = -a * denom_im / denom_mag2;
+
+            // H = LP*(1 - 1/ratio) + 1/ratio
+            let h_re = lp_re * (1.0 - inv_ratio) + inv_ratio;
+            let h_im = lp_im * (1.0 - inv_ratio);
+
+            // 监听模式：被移除成分 = 1 - H
+            let (g_re, g_im) = if monitoring == 1 {
+                (1.0 - h_re, -h_im)
             } else {
-                self.frame.output_db[b] = db;
-            }
+                (h_re, h_im)
+            };
+            let gain = (g_re * g_re + g_im * g_im).sqrt().max(1e-6);
+            let gain_db = (20.0 * gain.log10()) as f32;
+
+            let out_db = self.frame.input_db[b] + gain_db;
+            self.frame.output_db[b] = out_db.max(DB_FLOOR);
         }
     }
 }

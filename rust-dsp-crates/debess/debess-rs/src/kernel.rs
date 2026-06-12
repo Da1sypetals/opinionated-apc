@@ -1,5 +1,11 @@
 use crate::parameters::parameter;
 
+// Range 旋钮：最大衰减量上限（dB）
+pub const RANGE_MAX_DB: f64 = 36.0;
+// Frequency 旋钮：齿音分频点范围（Hz，对数）
+pub const FREQ_MIN: f64 = 2000.0;
+pub const FREQ_MAX: f64 = 16000.0;
+
 // 单声道处理核，逐字移植自 Airwindows DeBess::DeBessKernel
 // 状态数组大小与原始 C++ 一致（41），sharpness 上限为 40
 pub struct DeBessKernel {
@@ -38,8 +44,17 @@ impl Derived {
             sharpness = 2.0;
         }
         let speed = 0.1 / sharpness;
-        let depth = 1.0 / (params[parameter::DEPTH] + 0.0001);
-        let iir_amount = params[parameter::FILTER];
+
+        // Range：DEPTH 映射为最大衰减量（dB），方向正向、感知线性。
+        // depth 是 ratio 上限：DEPTH=0 → 1.0（关闭），DEPTH=1 → ~63（约 -36 dB）
+        let max_reduction_db = params[parameter::DEPTH] * RANGE_MAX_DB;
+        let depth = 10f64.powf(max_reduction_db / 20.0);
+
+        // Frequency：FILTER 映射为齿音分频点（Hz，对数 FREQ_MIN..FREQ_MAX），
+        // 再换算为一阶低通系数（齿音 = input - 该低通）
+        let fc = FREQ_MIN * (FREQ_MAX / FREQ_MIN).powf(params[parameter::FILTER]);
+        let iir_amount = 1.0 - (-2.0 * std::f64::consts::PI * fc / sample_rate).exp();
+
         let monitoring = params[parameter::SENSE_MON] as i32;
 
         Self {
@@ -84,6 +99,12 @@ impl DeBessKernel {
         self.flip = false;
         // 原始用 rand() 播种一个非零 fpd，这里用固定非零种子即可（仅用于 dither PRNG）
         self.fpd = 17;
+    }
+
+    // 当前去齿音比率（>=1），用于可视化推导频响。两路交替使用，取较大者代表当前衰减强度
+    #[inline]
+    pub fn ratio(&self) -> f64 {
+        self.ratio_a.max(self.ratio_b)
     }
 
     // 处理单个样本，逐字移植自 Process 的 while 循环体

@@ -1,15 +1,42 @@
 import { getSliderState, getToggleState } from "./juce/index.js";
 import { drawKnob } from "./knob.js";
-import { fmt, fmtLabel } from "./format.js";
+import { fmt, fmtDesc } from "./format.js";
 import { SpectrumAnalyzer } from "./viz/spectrum.js";
 import { GrTimeline } from "./viz/timeline.js";
 import { Meter } from "./viz/meter.js";
 
-// ═══ Tooltip ═══
+// ═══ Tooltip：定位在目标控件正上方 ═══
 const tt = document.getElementById('tt');
 let ttT;
-function showTip(pid, norm) {
-    tt.textContent = fmtLabel(pid) + ': ' + fmt(pid, norm);
+
+function positionTipAbove(el) {
+    const r = el.getBoundingClientRect();
+    tt.style.left = (r.left + r.width / 2) + 'px';
+    tt.style.top = (r.top - 8) + 'px';
+}
+
+// 拖动/滚动时：在旋钮上方显示当前数值
+function showValueTip(el, pid, norm) {
+    clearTimeout(ttT);
+    tt.className = 'value';
+    tt.textContent = fmt(pid, norm);
+    positionTipAbove(el);
+    tt.style.opacity = '1';
+}
+
+// 悬浮时：在旋钮上方显示英文用途说明
+function showDescTip(el, pid) {
+    clearTimeout(ttT);
+    tt.className = 'desc';
+    tt.textContent = fmtDesc(pid);
+    positionTipAbove(el);
+    tt.style.opacity = '1';
+}
+
+function hideTip(delay = 0) {
+    clearTimeout(ttT);
+    if (delay > 0) ttT = setTimeout(() => tt.style.opacity = '0', delay);
+    else tt.style.opacity = '0';
 }
 
 // ═══ 旋钮（绑定 JUCE slider relay） ═══
@@ -35,7 +62,7 @@ document.querySelectorAll('.kc').forEach(c => {
         knobStartY = e.clientY;
         knobStartVal = state.getNormalisedValue();
         state.sliderDragStarted();
-        showTip(pid, knobStartVal);
+        showValueTip(c, pid, knobStartVal);
         e.preventDefault();
     });
     c.addEventListener('dblclick', () => {
@@ -49,8 +76,17 @@ document.querySelectorAll('.kc').forEach(c => {
         state.sliderDragStarted();
         state.setNormalisedValue(nv);
         state.sliderDragEnded();
-        showTip(pid, nv);
+        showValueTip(c, pid, nv);
+        hideTip(900);
     }, { passive: false });
+
+    // 悬浮：显示英文用途说明（拖动中不打断数值显示）
+    c.addEventListener('mouseenter', () => {
+        if (!activeKnob) showDescTip(c, pid);
+    });
+    c.addEventListener('mouseleave', () => {
+        if (!activeKnob) hideTip();
+    });
 });
 
 document.addEventListener('mousemove', e => {
@@ -58,15 +94,13 @@ document.addEventListener('mousemove', e => {
     const sens = e.shiftKey ? 0.001 : 0.005;
     const nv = Math.max(0, Math.min(1, knobStartVal + (knobStartY - e.clientY) * sens));
     activeKnob.state.setNormalisedValue(nv);
-    showTip(activeKnob.pid, nv);
-    tt.style.opacity = '1';
-    clearTimeout(ttT);
+    showValueTip(activeKnob.canvas, activeKnob.pid, nv);
 });
 document.addEventListener('mouseup', () => {
     if (activeKnob) {
         activeKnob.state.sliderDragEnded();
         activeKnob = null;
-        ttT = setTimeout(() => tt.style.opacity = '0', 800);
+        hideTip(700);
     }
 });
 
@@ -88,10 +122,14 @@ monBtn.addEventListener('click', () => monState.setValue(!monState.getValue()));
 
 // ═══ 可视化组件 ═══
 const spectrum = new SpectrumAnalyzer(document.getElementById('spectrumCanvas'), {
-    fMin: 20, fMax: 20000, dbMin: -72, dbMax: 6, binCount: 128,
+    fMin: 20, fMax: 20000, dbMin: -90, dbMax: 6, binCount: 192,
+    releaseDbPerSec: 22,
     series: [
-        { key: 'input', color: 'rgba(120,170,200,0.55)', lineWidth: 1.2 },
-        { key: 'output', color: '#5ac8e0', lineWidth: 1.6 },
+        { key: 'input', color: 'rgba(120,170,200,0.5)', lineWidth: 1.1 },
+        {
+            key: 'output', color: '#5ac8e0', lineWidth: 1.8, fill: true,
+            fillTopColor: 'rgba(90,200,224,0.30)', fillBottomColor: 'rgba(90,200,224,0.02)',
+        },
     ],
     diffFill: { from: 'input', to: 'output', color: 'rgba(232,68,90,0.16)' },
 });

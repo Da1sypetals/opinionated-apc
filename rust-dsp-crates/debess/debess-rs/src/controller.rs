@@ -81,6 +81,15 @@ impl DeBessController {
             self.mono_in[i] = 0.5 * (in_l[i] + in_r[i]);
             self.mono_out[i] = 0.5 * (out_l[i] + out_r[i]);
         }
-        self.viz.feed(&self.mono_in[..n], &self.mono_out[..n]);
+        // 用去齿音滤波器的真实频响把 output 频谱由 input 推导出来，
+        // 因此需要当前 ratio、低通系数（FILTER）与监听模式
+        let ratio = self.kernel_l.ratio().max(self.kernel_r.ratio());
+        self.viz.feed(
+            &self.mono_in[..n],
+            &self.mono_out[..n],
+            ratio,
+            derived.iir_amount,
+            derived.monitoring,
+        );
     }
 }

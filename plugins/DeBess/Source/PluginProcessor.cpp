@@ -8,7 +8,7 @@ const juce::String DeBessAudioProcessor::paramIds[NUM_PARAMS] = {
 };
 
 const juce::String DeBessAudioProcessor::paramNames[NUM_PARAMS] = {
-    "Intensity", "Sharpness", "Depth", "Filter", "Sense Mon"
+    "Amount", "Sharpness", "Range", "Frequency", "Listen"
 };
 
 const bool DeBessAudioProcessor::paramIsBool[NUM_PARAMS] = {

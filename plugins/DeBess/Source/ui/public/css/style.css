@@ -194,10 +194,20 @@ html, body {
 /* Tooltip */
 #tt {
   position: fixed; z-index: 999;
-  background: rgba(12,18,24,0.95); color: #5ac8e0;
+  transform: translate(-50%, -100%);
+  background: rgba(12,18,24,0.96); color: #5ac8e0;
   font-family: 'Rajdhani', sans-serif;
-  font-size: 10px; letter-spacing: 1px;
-  padding: 2px 8px; border-radius: 3px;
+  font-size: 10px; letter-spacing: 0.5px; line-height: 1.35;
+  text-align: center;
+  padding: 5px 9px; border-radius: 4px;
   border: 1px solid rgba(90,200,224,0.2);
-  pointer-events: none; opacity: 0; transition: opacity 0.1s;
+  pointer-events: none; opacity: 0; transition: opacity 0.12s;
+}
+#tt.value {
+  font-size: 12px; font-weight: 600; letter-spacing: 1px;
+  max-width: none; white-space: nowrap;
+}
+#tt.desc {
+  max-width: 190px; white-space: normal;
+  color: #9fc4d4;
 }
