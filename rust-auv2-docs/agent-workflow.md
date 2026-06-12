@@ -19,6 +19,8 @@ Three layers, strictly separated:
 
 The C++ layer contains zero DSP logic and zero UI rendering logic. It is purely declarative glue code required by JUCE's plugin format wrapping.
 
+You can split `mod`s in Rust code if you think you need to.
+
 ---
 
 ## Directory Structure
