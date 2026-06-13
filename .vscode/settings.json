@@ -1,7 +1,10 @@
 {
     "rust-analyzer.linkedProjects": [
         "rust-dsp-crates/cloudseed/cloudseed-rs/Cargo.toml",
+        "rust-dsp-crates/compressor/zlcompressor-rs/Cargo.toml",
+        "rust-dsp-crates/debess/debess-rs/Cargo.toml",
         "plugins/CloudSeed/dsp/Cargo.toml",
-        "rust-dsp-crates/compressor/zlcompressor-rs/Cargo.toml"
+        "plugins/ZLComp/dsp/Cargo.toml",
+        "plugins/DeBess/dsp/Cargo.toml"
     ]
 }
