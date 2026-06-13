@@ -22,3 +22,4 @@ add_subdirectory(_tools/JUCE)
 # ============================================
 add_subdirectory(plugins/CloudSeed)
 add_subdirectory(plugins/DeBess)
+add_subdirectory(plugins/ZLComp)

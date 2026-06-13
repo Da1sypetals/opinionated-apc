@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ZLComp</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="plugin">
+
+  <div class="hdr">
+    <div class="hdr-led" id="bypassLed"></div>
+    <span class="hdr-name">ZL COMP</span>
+    <span class="hdr-right" id="sampleRateDisplay"></span>
+  </div>
+
+  <div class="viz-row">
+    <div class="curve-box"><canvas id="cvCurve"></canvas></div>
+    <div class="gr-box">
+      <div class="gr-head"><span class="gr-lbl">GR</span><span class="gr-val" id="grVal">0.0 dB</span></div>
+      <canvas id="cvGR"></canvas>
+    </div>
+    <div class="meters-box">
+      <div class="mbar"><span class="mbar-lbl">I</span><div class="mbar-track"><div class="mbar-fill mbar-fill-i" id="meterIn"></div></div></div>
+      <div class="mbar"><span class="mbar-lbl">O</span><div class="mbar-track"><div class="mbar-fill mbar-fill-o" id="meterOut"></div></div></div>
+    </div>
+  </div>
+
+  <div class="ctrl-area">
+    <div class="ctrl-left">
+      <div class="knobs-pair">
+        <div class="knob-col"><canvas class="kc" data-p="threshold" data-sz="72"></canvas><div class="kval" id="val-threshold"></div><div class="kname">THRESH</div></div>
+        <div class="knob-col"><canvas class="kc" data-p="ratio" data-sz="72"></canvas><div class="kval" id="val-ratio"></div><div class="kname">RATIO</div></div>
+      </div>
+      <div class="bars-pair">
+        <div class="bar-slider" data-p="knee"><div class="bar-fill" id="fill-knee"></div><div class="bar-text"><span class="bar-name">KNEE</span><span class="bar-val" id="val-knee"></span></div></div>
+        <div class="bar-slider" data-p="range"><div class="bar-fill" id="fill-range"></div><div class="bar-text"><span class="bar-name">RANGE</span><span class="bar-val" id="val-range"></span></div></div>
+      </div>
+    </div>
+
+    <div class="ctrl-mid">
+      <div class="knob-col"><canvas class="kc" data-p="attack" data-sz="50"></canvas><div class="kval" id="val-attack"></div><div class="kname">ATTACK</div></div>
+      <div class="knob-col"><canvas class="kc" data-p="release" data-sz="50"></canvas><div class="kval" id="val-release"></div><div class="kname">RELEASE</div></div>
+    </div>
+
+    <div class="ctrl-knobs">
+      <div class="ctrl-knobs-grid">
+        <div class="knob-col sm"><canvas class="kc" data-p="pump" data-sz="32"></canvas><div class="kval" id="val-pump"></div><div class="kname">PUMP</div></div>
+        <div class="knob-col sm"><canvas class="kc" data-p="smooth" data-sz="32"></canvas><div class="kval" id="val-smooth"></div><div class="kname">SMOOTH</div></div>
+        <div class="knob-col sm"><canvas class="kc" data-p="makeup" data-sz="32"></canvas><div class="kval" id="val-makeup"></div><div class="kname">MAKEUP</div></div>
+        <div class="knob-col sm"><canvas class="kc" data-p="wet" data-sz="32"></canvas><div class="kval" id="val-wet"></div><div class="kname">WET</div></div>
+        <div class="knob-col sm"><canvas class="kc" data-p="rms_length" data-sz="28"></canvas><div class="kval" id="val-rms_length"></div><div class="kname">LEN</div></div>
+        <div class="knob-col sm"><canvas class="kc" data-p="rms_speed" data-sz="28"></canvas><div class="kval" id="val-rms_speed"></div><div class="kname">SPD</div></div>
+        <div class="knob-col sm"><canvas class="kc" data-p="rms_mix" data-sz="28"></canvas><div class="kval" id="val-rms_mix"></div><div class="kname">MIX</div></div>
+      </div>
+      <div class="ctrl-knobs-bars">
+        <div class="bar-slider" data-p="lookahead"><div class="bar-fill" id="fill-lookahead"></div><div class="bar-text"><span class="bar-name">LOOK</span><span class="bar-val" id="val-lookahead"></span></div></div>
+        <div class="bar-slider" data-p="hold"><div class="bar-fill" id="fill-hold"></div><div class="bar-text"><span class="bar-name">HOLD</span><span class="bar-val" id="val-hold"></span></div></div>
+      </div>
+    </div>
+
+    <div class="ctrl-btns">
+      <button class="tbtn-style" id="btnStyle">CLEAN</button>
+      <button class="tbtn" id="btnStereo">M/S</button>
+      <button class="tbtn" id="btnRms">RMS</button>
+      <button class="tbtn" id="btnInf">INF</button>
+    </div>
+  </div>
+
+  <div class="ftr">
+    <span class="ftr-info">ZL COMPRESSOR</span>
+    <span class="ftr-right" id="latencyDisplay"></span>
+  </div>
+
+</div>
+<script type="module" src="js/index.js"></script>
+</body>
+</html>

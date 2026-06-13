@@ -1,3 +1,7 @@
+TOP rule: You are Not allowed to enter plan mode unless explicitly specified by user. Even if user explicitly specify that they want you to enter prime mode, you must double check If user really means it, otherwise, you are strictly not allowed to enter plan mode.
+
+Also you are not allowed to let subagent write code for you. This 100% causes code conflict.
+
 # Rust DSP + WebView UI + JUCE AUv2 Plugin Architecture
 
 This document records the full architecture, implementation, build system, validation, and pitfalls encountered when building an AudioUnit v2 plugin with:
@@ -265,14 +269,7 @@ python3 plugins/CloudSeed/build.py validate        # Run auval
 python3 plugins/CloudSeed/build.py all             # build --au-only -> install -> clear -> validate
 ```
 
-Equivalent manual commands:
-
-```bash
-cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64
-cmake --build build --target CloudSeed_AU --config Release -j$(sysctl -n hw.ncpu)
-cp -R build/plugins/CloudSeed/CloudSeed_artefacts/Release/AU/CloudSeed.component ~/Library/Audio/Plug-Ins/Components/
-auval -v aufx CSed Awin
-```
+You MUST not build with bare `cmake` commands, You MUST use `build.py` because this is the **only** entrypoint for building a plugin.
 
 ---
 
