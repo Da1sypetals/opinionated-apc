@@ -5,6 +5,8 @@ import { Meter } from "./viz/meter.js";
 
 const DPR = window.devicePixelRatio || 1;
 const STYLES = ['CLEAN', 'CLASSIC', 'OPTICAL', 'VOCAL'];
+const curveParams = { th: -32, rat: 3, knee: 8 };
+const curveSignal = { inDb: -72, reducedDb: -72, outDb: -72 };
 
 // ═══ 旋钮绑定 ═══
 let activeKnob = null, knobStartY = 0, knobStartVal = 0;
@@ -19,6 +21,7 @@ document.querySelectorAll('.kc').forEach(c => {
         const n = state.getNormalisedValue();
         drawKnob(c, n);
         if (valEl) valEl.textContent = fmt(pid, n);
+        updateCurveParam(pid, n);
     };
     state.valueChangedEvent.addListener(refresh);
     state.propertiesChangedEvent.addListener(refresh);
@@ -68,6 +71,7 @@ document.querySelectorAll('.bar-slider').forEach(bar => {
         const n = state.getNormalisedValue();
         fillEl.style.width = (n * 100) + '%';
         if (valEl) valEl.textContent = fmt(pid, n);
+        updateCurveParam(pid, n);
     };
     state.valueChangedEvent.addListener(refresh);
     state.propertiesChangedEvent.addListener(refresh);
@@ -144,21 +148,25 @@ const meterOutEl = document.getElementById('meterOut');
 const srDisplay = document.getElementById('sampleRateDisplay');
 const latDisplay = document.getElementById('latencyDisplay');
 
-let curveParams = { th: -32, rat: 3, knee: 8 };
-
-window.__zlcompViz = function(json) {
+window.__zlcompViz = function(json, audioActive = true) {
     let d;
     try { d = JSON.parse(json); } catch(e) { return; }
 
-    const gr = Math.max(Math.abs(d.gr_l || 0), Math.abs(d.gr_r || 0));
+    const gr = audioActive ? Math.max(Math.abs(d.gr_l || 0), Math.abs(d.gr_r || 0)) : 0;
     grHistory.copyWithin(0, 1);
     grHistory[grHistory.length - 1] = gr;
     grValEl.textContent = gr > 0.05 ? ('-' + gr.toFixed(1) + ' dB') : '0.0 dB';
 
-    meterInEl.style.height = Math.min(100, Math.max(0, (1 - Math.abs(d.gr_l || 0) / 40) * 60 + 40)) + '%';
-    meterOutEl.style.height = Math.min(100, Math.max(0, (1 - gr / 40) * 55 + 35)) + '%';
+    const nextIn = audioActive && Number.isFinite(d.in_db) ? clampDb(d.in_db) : -72;
+    const nextOut = audioActive && Number.isFinite(d.out_db) ? clampDb(d.out_db) : -72;
+    const nextReduced = audioActive ? clampDb(nextIn - gr) : -72;
+    curveSignal.inDb += (nextIn - curveSignal.inDb) * 0.35;
+    curveSignal.reducedDb += (nextReduced - curveSignal.reducedDb) * 0.35;
+    curveSignal.outDb += (nextOut - curveSignal.outDb) * 0.35;
 
-    if (d.th !== undefined) curveParams = { th: d.th, rat: d.rat, knee: d.knee };
+    meterInEl.style.height = levelPct(curveSignal.inDb) + '%';
+    meterOutEl.style.height = levelPct(curveSignal.outDb) + '%';
+
     if (d.sr) srDisplay.textContent = (d.sr / 1000) + ' kHz';
     if (d.lat !== undefined) latDisplay.textContent = 'LATENCY: ' + d.lat + ' smp';
 
@@ -167,6 +175,22 @@ window.__zlcompViz = function(json) {
 };
 
 // ═══ I/O Curve ═══
+function updateCurveParam(pid, norm) {
+    if (pid === 'threshold') curveParams.th = denormalize(pid, norm);
+    else if (pid === 'ratio') curveParams.rat = denormalize(pid, norm);
+    else if (pid === 'knee') curveParams.knee = denormalize(pid, norm);
+    else return;
+    drawCurve();
+}
+
+function clampDb(db) {
+    return Math.max(-72, Math.min(0, db));
+}
+
+function levelPct(db) {
+    return Math.max(0, Math.min(100, ((clampDb(db) + 72) / 72) * 100));
+}
+
 function drawCurve() {
     const cv = document.getElementById('cvCurve');
     const s = 200;
@@ -199,6 +223,36 @@ function drawCurve() {
     ctx.beginPath(); ctx.moveTo(dx(dMin), dy(comp(dMin)));
     for (let d = dMin; d <= dMax; d += 0.5) ctx.lineTo(dx(d), dy(comp(d)));
     ctx.strokeStyle = '#d4943e'; ctx.lineWidth = 1.8; ctx.stroke();
+
+    drawCurveLevel(ctx, p, w, dx, dy);
+}
+
+function drawCurveLevel(ctx, p, w, dx, dy) {
+    const inputDb = clampDb(curveSignal.inDb);
+    const reducedDb = clampDb(curveSignal.reducedDb);
+    if (inputDb <= -71.9 && reducedDb <= -71.9) return;
+
+    const x = dx(inputDb);
+    const yIn = dy(inputDb);
+    const yReduced = dy(reducedDb);
+    const yBase = p + w;
+    const barW = 7;
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = 'rgba(75, 163, 212, 0.32)';
+    ctx.fillRect(x - barW * 0.5, Math.min(yReduced, yBase), barW, Math.abs(yBase - yReduced));
+
+    if (yIn < yReduced) {
+        ctx.fillStyle = 'rgba(235, 230, 205, 0.52)';
+        ctx.fillRect(x - barW * 0.5, yIn, barW, yReduced - yIn);
+    }
+
+    ctx.beginPath();
+    ctx.arc(x, yReduced, 3.2, 0, Math.PI * 2);
+    ctx.fillStyle = '#4ba3d4';
+    ctx.fill();
+    ctx.restore();
 }
 
 // ═══ GR Timeline ═══

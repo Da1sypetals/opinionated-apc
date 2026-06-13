@@ -70,10 +70,7 @@ void ZLCompAudioProcessorEditor::timerCallback()
 
     double now = juce::Time::getMillisecondCounterHiRes();
     double elapsed = now - audioProcessor.lastProcessBlockTime.load(std::memory_order_relaxed);
-    if (elapsed > 200.0)
-    {
-        // DAW 暂停时无需 decay (压缩器没有频谱)，但仍然推送 GR=0
-    }
+    const bool audioActive = elapsed <= 200.0;
 
     const char* json = audioProcessor.getVizJson();
     if (json == nullptr)
@@ -81,7 +78,9 @@ void ZLCompAudioProcessorEditor::timerCallback()
 
     juce::String js = "if(window.__zlcompViz){window.__zlcompViz('";
     js += json;
-    js += "');}";
+    js += "',";
+    js += audioActive ? "true" : "false";
+    js += ");}";
     webView->evaluateJavascript(js);
 }
 

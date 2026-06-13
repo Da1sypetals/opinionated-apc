@@ -8,6 +8,8 @@ use zlcompressor_rs::params::{self, idx};
 pub struct ZLCompEngine {
     controller: Controller,
     param_cache: [f32; idx::COUNT],
+    input_db: f32,
+    output_db: f32,
     viz_json: CString,
 }
 
@@ -26,6 +28,8 @@ pub extern "C" fn zlcomp_create(sample_rate: i32) -> *mut ZLCompEngine {
     Box::into_raw(Box::new(ZLCompEngine {
         controller,
         param_cache,
+        input_db: -120.0,
+        output_db: -120.0,
         viz_json: CString::new("{}").unwrap(),
     }))
 }
@@ -38,9 +42,15 @@ pub extern "C" fn zlcomp_destroy(engine: *mut ZLCompEngine) {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn zlcomp_set_sample_rate(engine: *mut ZLCompEngine, sample_rate: i32, max_block_size: i32) {
+pub extern "C" fn zlcomp_set_sample_rate(
+    engine: *mut ZLCompEngine,
+    sample_rate: i32,
+    max_block_size: i32,
+) {
     let engine = unsafe { &mut *engine };
-    engine.controller.prepare(sample_rate as f64, max_block_size as usize);
+    engine
+        .controller
+        .prepare(sample_rate as f64, max_block_size as usize);
     for i in 0..idx::COUNT {
         engine.controller.set_param(i, engine.param_cache[i]);
     }
@@ -80,7 +90,9 @@ pub extern "C" fn zlcomp_process(
         output_r.copy_from_slice(input_r);
     }
 
+    engine.input_db = peak_db(output_l, output_r);
     engine.controller.process(output_l, output_r);
+    engine.output_db = peak_db(output_l, output_r);
 }
 
 #[unsafe(no_mangle)]
@@ -150,9 +162,11 @@ pub extern "C" fn zlcomp_get_viz_json(engine: *mut ZLCompEngine) -> *const c_cha
     let mut s = String::with_capacity(256);
     let _ = write!(
         s,
-        "{{\"gr_l\":{:.2},\"gr_r\":{:.2},\"th\":{:.1},\"rat\":{:.2},\"knee\":{:.2},\"sr\":{},\"lat\":{}}}",
+        "{{\"gr_l\":{:.2},\"gr_r\":{:.2},\"in_db\":{:.2},\"out_db\":{:.2},\"th\":{:.1},\"rat\":{:.2},\"knee\":{:.2},\"sr\":{},\"lat\":{}}}",
         gr.left,
         gr.right,
+        engine.input_db,
+        engine.output_db,
         comp.get_threshold(),
         comp.get_ratio(),
         comp.get_knee_w(),
@@ -162,4 +176,16 @@ pub extern "C" fn zlcomp_get_viz_json(engine: *mut ZLCompEngine) -> *const c_cha
 
     engine.viz_json = CString::new(s).unwrap();
     engine.viz_json.as_ptr()
+}
+
+fn peak_db(left: &[f32], right: &[f32]) -> f32 {
+    let mut peak = 0.0f32;
+    for i in 0..left.len() {
+        peak = peak.max(left[i].abs()).max(right[i].abs());
+    }
+    if peak <= 1.0e-12 {
+        -120.0
+    } else {
+        20.0 * peak.log10()
+    }
 }
