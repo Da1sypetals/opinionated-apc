@@ -129,6 +129,12 @@ pub extern "C" fn debess_clear_buffers(engine: *mut DeBessEngine) {
     engine.controller.clear_buffers();
 }
 
+#[unsafe(no_mangle)]
+pub extern "C" fn debess_viz_decay(engine: *mut DeBessEngine) {
+    let engine = unsafe { &mut *engine };
+    engine.controller.viz_decay();
+}
+
 // 读取可视化快照并格式化为 JSON，返回的指针在下次调用本函数前有效
 // 仅 UI 线程调用
 #[unsafe(no_mangle)]
@@ -153,8 +159,9 @@ pub extern "C" fn debess_get_viz_json(engine: *mut DeBessEngine) -> *const c_cha
     }
     let _ = write!(
         s,
-        "],\"gr\":{:.2},\"il\":{:.3},\"ol\":{:.3}}}",
-        frame.gr_db, frame.input_level, frame.output_level
+        "],\"gr\":{:.2},\"il\":{:.3},\"ol\":{:.3},\"a\":{}}}",
+        frame.gr_db, frame.input_level, frame.output_level,
+        if frame.active { 1 } else { 0 }
     );
 
     engine.viz_json = CString::new(s).unwrap();

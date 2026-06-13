@@ -34,6 +34,10 @@ public:
 
     // 供 Editor 在 UI 线程读取可视化 JSON（逻辑全在 Rust，C++ 仅转发）
     const char* getVizJson();
+    // DAW 暂停后由 Editor 调用，驱动 Rust 侧频谱衰减
+    void vizDecay();
+
+    std::atomic<double> lastProcessBlockTime { 0.0 };
 
     juce::AudioProcessorValueTreeState apvts;
 

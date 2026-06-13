@@ -217,11 +217,16 @@ Corrosion handles:
 ```cmake
 set(PLUGIN_FORMATS AU Standalone)
 juce_add_plugin(CloudSeed
+    COMPANY_NAME "Da1sypetals"
+    PLUGIN_MANUFACTURER_CODE Awin
+    PLUGIN_CODE CSed
     FORMATS ${PLUGIN_FORMATS}
     AU_MAIN_TYPE kAudioUnitType_Effect
     ...
 )
 ```
+
+All plugins in this repo use `COMPANY_NAME "Da1sypetals"`. Logic Pro groups plugins by this field in the Audio Units menu. If different plugins use different COMPANY_NAME values, they appear under different submenus. Changing COMPANY_NAME requires rebuilding and reinstalling **all** plugins, then clearing AU caches and restarting Logic.
 
 ### Binary Data for Web Resources
 
@@ -259,14 +264,14 @@ Equivalent manual commands:
 cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64
 cmake --build build --target CloudSeed_AU --config Release -j$(sysctl -n hw.ncpu)
 cp -R build/plugins/CloudSeed/CloudSeed_artefacts/Release/AU/CloudSeed.component ~/Library/Audio/Plug-Ins/Components/
-auval -v aufx CSed Nfld
+auval -v aufx CSed Awin
 ```
 
 ---
 
 ## Validation
 
-`auval -v aufx CSed Nfld` passes all tests:
+`auval -v aufx CSed Awin` passes all tests:
 - Render tests at multiple sample rates (11025, 22050, 44100, 48000, 96000, 192000 Hz)
 - Slicing render test
 - Connection semantics
@@ -299,7 +304,7 @@ Root cause: There are THREE separate AU caches, all of which can hold stale data
 
 1. **System AudioComponentRegistrar daemon** — in-memory cache of registered AU components.
 2. **System AudioComponentCache plist** — `~/Library/Preferences/com.apple.audio.AudioComponentCache.plist`. Stores channel configurations, bus counts, etc.
-3. **Logic Pro's own per-plugin cache** — stored inside `~/Library/Preferences/com.apple.logic10.plist` under keys like `"aufx-CSed-Nfld"`. Contains its own copy of `ChannelConfigurations`.
+3. **Logic Pro's own per-plugin cache** — stored inside `~/Library/Preferences/com.apple.logic10.plist` under keys like `"aufx-CSed-Awin"`. Contains its own copy of `ChannelConfigurations`.
 
 Deleting only the system caches (items 1 and 2) does NOT fix the problem if Logic's own plist (item 3) still has stale data. Logic reads its own plist first.
 
@@ -308,15 +313,15 @@ Solution — clear all three:
 killall -9 AudioComponentRegistrar
 rm -f ~/Library/Preferences/com.apple.audio.AudioComponentCache.plist
 rm -rf ~/Library/Caches/AudioUnitCache/
-defaults delete com.apple.logic10 "aufx-CSed-Nfld"
+defaults delete com.apple.logic10 "aufx-CSed-Awin"
 ```
 Then restart Logic Pro. It will re-scan the AU and write fresh entries.
 
-Generalized form for the Logic plist key: `"<type>-<subtype>-<manufacturer>"`, e.g. `"aufx-CSed-Nfld"`.
+Generalized form for the Logic plist key: `"<type>-<subtype>-<manufacturer>"`, e.g. `"aufx-CSed-Awin"`.
 
 Diagnostic: if `auval` and the AudioComponent C API both report correct channel configs but Logic still hides the plugin, run:
 ```bash
-plutil -p ~/Library/Preferences/com.apple.logic10.plist | grep -A 15 "aufx-CSed-Nfld"
+plutil -p ~/Library/Preferences/com.apple.logic10.plist | grep -A 15 "aufx-CSed-Awin"
 ```
 If the cached `ChannelConfigurations` array is wrong, delete the key.
 
@@ -393,6 +398,42 @@ This handles both macOS (bare `/css/style.css`) and Windows (`https://juce.backe
 
 Note: CloudWash avoids this issue because its HTML loads JS via `<script type="module" src="js/index.js">`. WKWebView's ES6 module loader resolves import URLs through a different code path that does include the full scheme prefix. But `<link rel="stylesheet">` and non-module `<script src>` use bare relative paths on macOS.
 
+### 11. Logic Pro stops calling processBlock on pause
+
+Problem: When Logic Pro pauses playback, it stops calling `processBlock` entirely — no silence blocks, no callbacks, nothing. If the plugin has visualization, the C++ timer keeps reading the last frozen `SeqLock` snapshot and pushing it to JS. The spectrum display freezes at its last value instead of decaying to silence.
+
+This is well-documented behavior, not a bug: https://forum.juce.com/t/process-block-on-pause/55088
+
+Solution: Implement the watchdog timer pattern described in the Visualization section above. `processBlock` updates an atomic timestamp; `timerCallback` detects staleness and drives Rust-side decay.
+
+### 12. COMPANY_NAME determines Logic Pro plugin grouping
+
+Problem: Logic Pro groups third-party AU plugins by the `COMPANY_NAME` field from CMakeLists.txt, shown under Audio Units → \<COMPANY_NAME\> → \<plugin\>. If two plugins in the same repo use different COMPANY_NAME values (e.g., one says "Airwindows", another says "Da1sypetals"), they appear under different submenus.
+
+Solution: All plugins in this repo must use `COMPANY_NAME "Da1sypetals"`. When changing COMPANY_NAME, rebuild and reinstall **every** plugin, clear AU caches, and restart Logic.
+
+### 13. auval passing does not guarantee Logic Pro will load the plugin
+
+Problem: `auval -v aufx XXXX YYYY` passes all tests, system `AudioComponent` API reports the plugin as registered, but Logic Pro still shows "plugin unavailable" or hides it from the insert menu.
+
+Root cause: Logic has its own per-plugin validation cache (pitfall #3) that is independent of `auval`. Logic may also refuse to load a plugin if it was previously marked as failed in a prior session, or if a project references a stale plugin instance.
+
+Solution: Always run `build.py all` (which includes cache clearing). If Logic still refuses, check the Logic plist for stale entries and delete them. If Logic is stuck on a project that references an unavailable plugin, dismiss the error dialog — Logic will still open; then manually re-insert the plugin.
+
+### 14. Canvas fill path breaks when moveTo is used mid-path
+
+Problem: When drawing a filled area under a spectrum curve, calling `moveTo` inside the fill path (e.g., at the start of the curve trace) breaks the subpath. `closePath` then draws a diagonal line from the last point back to the `moveTo` point instead of following the bottom edge, producing a triangular gap in the fill.
+
+Solution: Split curve tracing into two functions: `_curveThrough(ctx, arr, w, h)` (no `moveTo`, only `quadraticCurveTo` + `lineTo`, for use inside fill paths where the start position is already set) and `_tracePath(ctx, arr, w, h)` (includes `moveTo`, for stroke-only paths).
+
+### 15. BinaryData symbols are path-independent — shared files work
+
+Problem (non-obvious): When multiple plugins reference the same JS file from a shared directory (e.g., `../../shared/ui/viz/spectrum.js`), it's unclear whether the BinaryData symbol will change.
+
+Fact: JUCE BinaryData symbols are derived from the **filename only**, ignoring the directory path. `../../shared/ui/viz/spectrum.js` produces `BinaryData::spectrum_js`, identical to what `Source/ui/public/js/viz/spectrum.js` would produce. The C++ resource provider does not need to change when files are moved to a shared directory.
+
+This enables the pattern: put reusable JS components in `shared/ui/viz/`, reference them from each plugin's CMakeLists.txt, and the C++ code remains identical across plugins.
+
 ---
 
 ## Performance Characteristics
@@ -400,7 +441,56 @@ Note: CloudWash avoids this issue because its HTML loads JS via `<script type="m
 - Rust static library adds zero runtime overhead (direct function call, no IPC, no serialization)
 - The 45-parameter loop in processBlock reads atomics and calls `cloudseed_set_parameter` per block (not per sample), negligible cost
 - WebView UI runs in a separate process/thread on macOS (WKWebView), does not affect audio thread
-- Timer callback at 30Hz for potential visualization updates (currently unused since all parameter sync is handled by JUCE relays)
+- Timer callback at 30Hz for visualization updates. For plugins with visualization, the timer reads a Rust-side `SeqLock<VizFrame>` snapshot via FFI, serializes to JSON, and pushes to JS via `evaluateJavascript`. See the Visualization section below.
+
+---
+
+## Visualization Data Flow
+
+For plugins with real-time visualization (spectrum, GR timeline, meters), the data flow is:
+
+```
+Audio thread (Rust) → SpectrumEngine/PeakMeter → VizFrame → SeqLock
+    ↓
+C++ Editor timerCallback (30Hz) → reads SeqLock → JSON → evaluateJavascript
+    ↓
+JS renderers (SpectrumAnalyzer / GrTimeline / Meter) → Canvas
+```
+
+Full architecture is documented in `rust-auv2-docs/viz-architecture.md`. The key points for every new plugin with visualization:
+
+### Temporal smoothing is in Rust, not JS
+
+All per-bin temporal smoothing happens in `viz-core::SpectrumEngine`, in linear power domain (not dB domain). JS renderers are stateless — they draw whatever data they receive, no ballistics.
+
+### Watchdog pattern for DAW pause detection
+
+Logic Pro stops calling `processBlock` when playback pauses (does not send silence blocks). Without detection, the C++ timer keeps pushing the last frozen frame to JS, and the spectrum never decays.
+
+Every plugin with visualization must implement this pattern:
+
+```cpp
+// PluginProcessor.h
+std::atomic<double> lastProcessBlockTime { 0.0 };
+
+// PluginProcessor.cpp — first line of processBlock
+lastProcessBlockTime.store(juce::Time::getMillisecondCounterHiRes(),
+                           std::memory_order_relaxed);
+
+// PluginEditor.cpp — timerCallback
+double elapsed = juce::Time::getMillisecondCounterHiRes()
+               - audioProcessor.lastProcessBlockTime.load(std::memory_order_relaxed);
+if (elapsed > 200.0)
+    audioProcessor.vizDecay();  // drives Rust-side decay
+```
+
+`vizDecay()` calls `SpectrumEngine::decay_to_silence()` which applies release-rate EMA decay to `smooth_power`, compensating for the timer/FFT frame rate difference via `release_coeff.powi(ceil(fft_frame_rate / 30))`.
+
+### Shared components
+
+Reusable Rust crate: `rust-dsp-crates/viz-core/` (SpectrumEngine, SeqLock, PeakMeter).
+
+Reusable JS renderers: `shared/ui/viz/` (spectrum.js, timeline.js, meter.js). Each plugin's CMakeLists references these via relative path (e.g. `../../shared/ui/viz/spectrum.js`). JUCE BinaryData symbols are based on filename only (not path), so the C++ resource provider does not need to change when files move between directories.
 
 ---
 

@@ -66,7 +66,11 @@ void DeBessAudioProcessorEditor::timerCallback()
     if (!webView || !webView->isVisible())
         return;
 
-    // 从 Rust 取已格式化好的 viz JSON，原样转发给 JS（C++ 不做任何计算）
+    double now = juce::Time::getMillisecondCounterHiRes();
+    double elapsed = now - audioProcessor.lastProcessBlockTime.load(std::memory_order_relaxed);
+    if (elapsed > 200.0)
+        audioProcessor.vizDecay();
+
     const char* json = audioProcessor.getVizJson();
     if (json == nullptr)
         return;

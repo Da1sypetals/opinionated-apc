@@ -30,9 +30,9 @@ juce_add_binary_data(DeBess_WebUI
         Source/ui/public/js/index.js
         Source/ui/public/js/knob.js
         Source/ui/public/js/format.js
-        Source/ui/public/js/viz/spectrum.js
-        Source/ui/public/js/viz/timeline.js
-        Source/ui/public/js/viz/meter.js
+        ../../shared/ui/viz/spectrum.js
+        ../../shared/ui/viz/timeline.js
+        ../../shared/ui/viz/meter.js
         Source/ui/public/js/juce/index.js
         Source/ui/public/js/juce/check_native_interop.js
 )

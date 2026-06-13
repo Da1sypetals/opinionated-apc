@@ -70,6 +70,7 @@ bool DeBessAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) c
 void DeBessAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
     juce::ScopedNoDenormals noDenormals;
+    lastProcessBlockTime.store(juce::Time::getMillisecondCounterHiRes(), std::memory_order_relaxed);
 
     // 将所有 APVTS 参数推送到 Rust
     for (int i = 0; i < NUM_PARAMS; ++i)
@@ -113,6 +114,11 @@ void DeBessAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce:
 const char* DeBessAudioProcessor::getVizJson()
 {
     return debess_get_viz_json(dspEngine);
+}
+
+void DeBessAudioProcessor::vizDecay()
+{
+    debess_viz_decay(dspEngine);
 }
 
 juce::AudioProcessorEditor* DeBessAudioProcessor::createEditor()

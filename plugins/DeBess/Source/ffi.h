@@ -15,6 +15,7 @@ float debess_get_parameter(void* engine, uint32_t param_index);
 uint32_t debess_get_state(void* engine, uint8_t* buffer, uint32_t buffer_size);
 void debess_set_state(void* engine, const uint8_t* buffer, uint32_t size);
 void debess_clear_buffers(void* engine);
+void debess_viz_decay(void* engine);
 const char* debess_get_viz_json(void* engine);
 
 }

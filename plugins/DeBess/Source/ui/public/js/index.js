@@ -123,7 +123,6 @@ monBtn.addEventListener('click', () => monState.setValue(!monState.getValue()));
 // ═══ 可视化组件 ═══
 const spectrum = new SpectrumAnalyzer(document.getElementById('spectrumCanvas'), {
     fMin: 20, fMax: 20000, dbMin: -90, dbMax: 6, binCount: 192,
-    releaseDbPerSec: 22,
     series: [
         { key: 'input', color: 'rgba(120,170,200,0.5)', lineWidth: 1.1 },
         {

@@ -1,17 +1,8 @@
 // 可复用频谱分析仪组件
 //
-// 与任意插件无关：构造时传入 canvas 与配置，外部通过 setSeries(key, dbArray)
-// 持续喂入各路 dB 数组，组件按对数频率轴 + dB 轴渲染网格与曲线。
-//
-// 显示质感（参考 FabFilter Pro-Q 等商业分析仪）：
-//   - 对数频率轴 + 后端恒定 Q 式 bin 能量聚合（数据侧已做）
-//   - 频谱倾斜补偿（数据侧已做）使曲线自然填满画面
-//   - 时域弹道：快起慢落（peak-with-decay），消除逐帧抖动
-//   - 平滑曲线（二次贝塞尔中点插值）+ 垂直渐变填充 + 高亮顶线
-//   - 十倍频程网格 + 频率/dB 标注
-//
-// 数据约定：每路 series 是一个长度为 binCount 的 dB 数组。
-// bin 在对数频率轴上等距分布（与后端的对数 bin 映射一致）。
+// 纯渲染器：外部通过 setSeries(key, dbArray) 喂入各路 dB 数组，
+// 组件按对数频率轴 + dB 轴渲染网格与曲线。
+// 所有时域平滑在 Rust 侧完成，JS 不做任何弹道处理。
 
 const DPR = window.devicePixelRatio || 1;
 
@@ -33,10 +24,6 @@ export class SpectrumAnalyzer {
         this.labelColor = opts.labelColor ?? 'rgba(120,170,200,0.55)';
         this.font = opts.font ?? '500 9px Rajdhani, sans-serif';
 
-        // 时域弹道：瞬时起、按 dB/秒 缓慢回落
-        this.releaseDbPerSec = opts.releaseDbPerSec ?? 24;
-
-        // 频率网格线（Hz）。主刻度带标签
         this.freqLines = opts.freqLines ?? [
             20, 30, 40, 50, 60, 80, 100, 200, 300, 400, 500, 600, 800,
             1000, 2000, 3000, 4000, 5000, 6000, 8000, 10000, 20000,
@@ -44,31 +31,26 @@ export class SpectrumAnalyzer {
         this.freqLabels = opts.freqLabels ?? {
             20: '20', 100: '100', 1000: '1k', 10000: '10k', 20000: '20k',
         };
-        // dB 横线步长
         this.dbStep = opts.dbStep ?? 12;
 
         // series 定义：{ key, color, lineWidth, fill(bool), fillColor/fillTopColor/fillBottomColor }
         this.series = opts.series ?? [];
-        // 差异填充：{ from, to, color } 在两路 series 之间填充
+        // 差异填充：{ from, to, color }
         this.diffFill = opts.diffFill ?? null;
 
-        this.data = new Map(); // key -> 目标 dB（来自后端）
-        this.disp = new Map(); // key -> 显示 dB（弹道平滑后）
+        this.data = new Map();
         for (const s of this.series) {
             this.data.set(s.key, new Float32Array(this.binCount).fill(this.dbMin));
-            this.disp.set(s.key, new Float32Array(this.binCount).fill(this.dbMin));
         }
 
         this._running = false;
         this._raf = null;
-        this._lastT = 0;
         this._render = this._render.bind(this);
     }
 
     setSeries(key, dbArray) {
         if (!this.data.has(key)) {
             this.data.set(key, new Float32Array(this.binCount).fill(this.dbMin));
-            this.disp.set(key, new Float32Array(this.binCount).fill(this.dbMin));
         }
         const dst = this.data.get(key);
         const n = Math.min(dbArray.length, this.binCount);
@@ -78,7 +60,6 @@ export class SpectrumAnalyzer {
     start() {
         if (this._running) return;
         this._running = true;
-        this._lastT = performance.now();
         this._raf = requestAnimationFrame(this._render);
     }
 
@@ -88,19 +69,16 @@ export class SpectrumAnalyzer {
         this._raf = null;
     }
 
-    // 对数频率 → x 像素
     _freqToX(hz, w) {
         const lmin = Math.log10(this.fMin);
         const lmax = Math.log10(this.fMax);
         return ((Math.log10(hz) - lmin) / (lmax - lmin)) * w;
     }
 
-    // bin 索引 → x 像素（bin 在对数频率轴上等距）
     _binToX(i, w) {
         return (i / (this.binCount - 1)) * w;
     }
 
-    // dB → y 像素
     _dbToY(db, h) {
         const top = h * this.padTop;
         const usable = h * (1 - this.padTop - this.padBottom);
@@ -121,43 +99,27 @@ export class SpectrumAnalyzer {
         return { w, h };
     }
 
-    // 弹道：瞬时起、缓慢落
-    _advance(dt) {
-        const fall = this.releaseDbPerSec * dt;
-        for (const s of this.series) {
-            const target = this.data.get(s.key);
-            const cur = this.disp.get(s.key);
-            for (let i = 0; i < this.binCount; i++) {
-                const t = target[i];
-                if (t >= cur[i]) cur[i] = t;
-                else cur[i] = Math.max(t, cur[i] - fall);
-            }
-        }
-    }
-
-    // 用二次贝塞尔中点插值生成平滑路径（不含 begin/close）
-    _tracePath(ctx, arr, w, h) {
+    // 贝塞尔曲线（不含起点 moveTo），供 fill 路径使用
+    _curveThrough(ctx, arr, w, h) {
         const n = this.binCount;
-        let px = this._binToX(0, w);
-        let py = this._dbToY(arr[0], h);
-        ctx.moveTo(px, py);
         for (let i = 1; i < n - 1; i++) {
             const x = this._binToX(i, w);
             const y = this._dbToY(arr[i], h);
             const nx = this._binToX(i + 1, w);
             const ny = this._dbToY(arr[i + 1], h);
-            const xc = (x + nx) / 2;
-            const yc = (y + ny) / 2;
-            ctx.quadraticCurveTo(x, y, xc, yc);
+            ctx.quadraticCurveTo(x, y, (x + nx) / 2, (y + ny) / 2);
         }
         ctx.lineTo(this._binToX(n - 1, w), this._dbToY(arr[n - 1], h));
     }
 
-    _render(now) {
+    // 含 moveTo 的完整路径，用于 stroke
+    _tracePath(ctx, arr, w, h) {
+        ctx.moveTo(this._binToX(0, w), this._dbToY(arr[0], h));
+        this._curveThrough(ctx, arr, w, h);
+    }
+
+    _render() {
         if (!this._running) return;
-        const dt = Math.min(0.1, (now - this._lastT) / 1000 || 0);
-        this._lastT = now;
-        this._advance(dt);
 
         const { w, h } = this._resize();
         const ctx = this.ctx;
@@ -166,13 +128,14 @@ export class SpectrumAnalyzer {
 
         this._drawGrid(w, h);
 
-        // 差异填充（如 reduction 区域）：input 与 output 之间
+        // 差异填充（如 reduction 区域）
         if (this.diffFill) {
-            const a = this.disp.get(this.diffFill.from);
-            const b = this.disp.get(this.diffFill.to);
+            const a = this.data.get(this.diffFill.from);
+            const b = this.data.get(this.diffFill.to);
             if (a && b) {
                 ctx.beginPath();
-                this._tracePath(ctx, a, w, h);
+                ctx.moveTo(this._binToX(0, w), this._dbToY(a[0], h));
+                this._curveThrough(ctx, a, w, h);
                 for (let i = this.binCount - 1; i >= 0; i--) {
                     ctx.lineTo(this._binToX(i, w), this._dbToY(b[i], h));
                 }
@@ -185,14 +148,14 @@ export class SpectrumAnalyzer {
         // 各路 series
         const floorY = this._dbToY(this.dbMin, h);
         for (const s of this.series) {
-            const arr = this.disp.get(s.key);
+            const arr = this.data.get(s.key);
             if (!arr) continue;
 
             if (s.fill) {
                 ctx.beginPath();
                 ctx.moveTo(this._binToX(0, w), floorY);
                 ctx.lineTo(this._binToX(0, w), this._dbToY(arr[0], h));
-                this._tracePath(ctx, arr, w, h);
+                this._curveThrough(ctx, arr, w, h);
                 ctx.lineTo(this._binToX(this.binCount - 1, w), floorY);
                 ctx.closePath();
                 if (s.fillTopColor && s.fillBottomColor) {
@@ -223,7 +186,6 @@ export class SpectrumAnalyzer {
         ctx.font = this.font;
         ctx.lineWidth = 1;
 
-        // 频率竖线
         for (const f of this.freqLines) {
             if (f < this.fMin || f > this.fMax) continue;
             const x = this._freqToX(f, w);
@@ -240,7 +202,6 @@ export class SpectrumAnalyzer {
             }
         }
 
-        // dB 横线
         ctx.textAlign = 'left';
         for (let db = this.dbMax; db >= this.dbMin; db -= this.dbStep) {
             const y = this._dbToY(db, h);

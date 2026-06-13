@@ -1,6 +1,7 @@
 use crate::kernel::{DeBessKernel, Derived};
 use crate::parameters::{DEFAULTS, parameter};
-use crate::viz::{VizAnalyzer, VizSnapshot};
+use crate::viz::{VizAnalyzer, VizFrame};
+use viz_core::SeqLock;
 
 // 立体声 DeBess 控制器：两个独立单声道处理核 + 可视化分析
 pub struct DeBessController {
@@ -53,8 +54,12 @@ impl DeBessController {
         self.viz.reset();
     }
 
-    pub fn viz_snapshot(&self) -> &VizSnapshot {
+    pub fn viz_snapshot(&self) -> &SeqLock<VizFrame> {
         self.viz.snapshot()
+    }
+
+    pub fn viz_decay(&mut self) {
+        self.viz.decay();
     }
 
     pub fn process(

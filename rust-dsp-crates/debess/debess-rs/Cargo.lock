@@ -13,7 +13,7 @@ name = "debess-rs"
 version = "0.1.0"
 dependencies = [
  "libm",
- "realfft",
+ "viz-core",
 ]
 
 [[package]]
@@ -95,4 +95,11 @@ checksum = "1ad61aed86bc3faea4300c7aee358b4c6d0c8d6ccc36524c96e4c92ccf26e77e"
 dependencies = [
  "num-integer",
  "strength_reduce",
+]
+
+[[package]]
+name = "viz-core"
+version = "0.1.0"
+dependencies = [
+ "realfft",
 ]
