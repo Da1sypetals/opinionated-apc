@@ -37,7 +37,9 @@ plugins/CloudSeed/
 │   ├── PluginEditor.h               WebView container
 │   ├── PluginEditor.cpp             relay setup + resource provider (~100 lines)
 │   └── ui/public/
-│       └── index.html               ALL-IN-ONE: HTML + CSS + JS fully inlined (~570 lines)
+│       ├── index.html
+│       ├── css/style.css
+│       └── js/                      index.js, knob.js, format.js, juce/...
 ├── CMakeLists.txt                   Corrosion + JUCE, macOS AU-only
 └── build.py                         build/install/clear/validate CLI tool
 ```
@@ -174,15 +176,13 @@ JUCE 8 provides a JavaScript library that exposes:
 
 The name string must match the relay name declared in C++ (e.g., `"late_line_decay"`).
 
-In production, this library must be inlined into `index.html` as plain ES5-compatible JavaScript (function/prototype style, not ES6 class/import). See pitfall #6.
-
 ### UI Implementation
 
-All JS and CSS are inlined into a single `index.html`. The JUCE frontend library is reimplemented inline using function constructors and prototype methods (not ES6 classes) to avoid module loading issues.
+JS/CSS are split into separate files (`index.html` / `style.css` / `index.js` / `knob.js` / `format.js` etc.), loaded via ES6 module `import`. macOS WKWebView fully supports ES6 modules (see pitfall #6).
 
-All 45 parameters rendered as either SVG arc knobs (continuous) or CSS toggle switches (boolean). Knob interaction: vertical mouse drag with shift-for-fine-control. Double-click resets to default.
+Parameters are rendered as SVG arc knobs (continuous) or CSS toggle switches (boolean). Interaction: vertical drag to adjust, Shift for fine control, scroll wheel for micro-adjust, double-click to reset.
 
-Parameter value display uses the same scaling formulas as the Rust `scale_param` function to show physical units (Hz, ms, dB, %).
+Parameter value display uses the same scaling formulas as the Rust side to show physical units (Hz, ms, dB, kHz, etc.).
 
 ### Layout for 40+ Parameters
 
@@ -230,18 +230,25 @@ All plugins in this repo use `COMPANY_NAME "Da1sypetals"`. Logic Pro groups plug
 
 ### Binary Data for Web Resources
 
-Since all JS/CSS is inlined into `index.html`, only one file needs to be embedded:
+JUCE embeds web resources into C++ byte arrays via `juce_add_binary_data`. JS/CSS are split into separate files; shared visualization components are referenced from a repo-level shared directory:
 
 ```cmake
-juce_add_binary_data(CloudSeed_WebUI
+juce_add_binary_data(DeBess_WebUI
     SOURCES
         Source/ui/public/index.html
+        Source/ui/public/css/style.css
+        Source/ui/public/js/index.js
+        Source/ui/public/js/knob.js
+        Source/ui/public/js/format.js
+        ../../shared/ui/viz/spectrum.js
+        ../../shared/ui/viz/timeline.js
+        ../../shared/ui/viz/meter.js
+        Source/ui/public/js/juce/index.js
+        Source/ui/public/js/juce/check_native_interop.js
 )
 ```
 
-JUCE embeds this file into C++ source as a byte array (`BinaryData::index_html` / `BinaryData::index_htmlSize`). The resource provider in PluginEditor.cpp maps the root URL to this single resource.
-
-If you must embed multiple files (not recommended for production): when multiple files have the same name in different directories (e.g., two `index.js`), JUCE mangles the BinaryData symbol for the second one as `index_js2`.
+BinaryData symbols are derived from the filename only, ignoring the path (see Pitfall #15). Two files with the same name in different directories (e.g., two `index.js`) are mangled as `index_js` and `index_js2`; the resource provider must explicitly map URL paths to the correct symbols.
 
 ---
 
@@ -278,7 +285,7 @@ auval -v aufx CSed Awin
 - Parameter setting (AudioUnitSetParameter and AudioUnitScheduleParameter)
 - Ramped parameter scheduling
 - MIDI
-- Channel configurations: [1,1] [1,2] [2,2]
+- Channel configurations: determined by plugin functionality. E.g., a mono effect supports [1,1]; a stereo reverb supports [1,2] [2,2]; a pure analyzer may only need [2,2]. Declare in `isBusesLayoutSupported` and verify with `auval` that the reported configs match expectations
 
 ---
 
@@ -294,7 +301,7 @@ Solution: Use underscores in the crate name: `name = "cloudseed_ffi"`.
 
 Problem: `isBusesLayoutSupported` only accepted stereo-stereo, so Logic Pro hid the plugin from mono channel strips.
 
-Solution: Accept mono-mono and mono-stereo layouts in `isBusesLayoutSupported`. Handle mono input in processBlock by passing the same channel pointer for both L and R.
+Solution: If the plugin should support stereo input, accept mono-mono and mono-stereo layouts in `isBusesLayoutSupported`. Handle mono input in processBlock by passing the same channel pointer for both L and R.
 
 ### 3. Logic Pro AU cache (multiple layers)
 
@@ -340,13 +347,11 @@ Solution: Declare members in this exact order in the Editor header:
 
 Problem: Two files named `index.js` in different directories (`js/index.js` and `js/juce/index.js`) get mangled by JUCE's BinaryData generator. The second one becomes `index_js2` / `index_js2Size`.
 
-Solution: In the resource provider, map URL paths explicitly to the correct BinaryData symbols. Better solution: inline everything into `index.html` so only one file is embedded. This eliminates the mangling issue entirely.
+Solution: In the resource provider, map URL paths explicitly to the correct BinaryData symbols.
 
-### 6. ES6 modules: platform-dependent behavior
+### 6. ES6 modules in WKWebView
 
-The WEBVIEW-PRODUCTION-GUIDE in this repo states "ES6 modules DO NOT WORK in WebView". This is a Windows-specific issue (WebView2 + custom URL scheme CORS). On macOS with WKWebView, ES6 `<script type="module">` and `import` statements work correctly. CloudWash ships with separate JS files using ES6 modules on macOS.
-
-Conclusion: on macOS-only builds, splitting JS/CSS into separate files with ES6 modules is safe and works. Inlining is only required for cross-platform builds targeting Windows.
+On macOS with WKWebView, ES6 `<script type="module">` and `import` statements work correctly. All plugins in this repo use separate JS/CSS files with ES6 modules.
 
 ### 7. BusesProperties default determines AU channel visibility
 
@@ -371,13 +376,9 @@ Problem: Setting `overflow: hidden` on section panels causes knobs and toggles a
 
 Solution: Use `overflow: visible` on panels. Use `grid-template-rows: auto auto` instead of `1fr 1fr` so rows size to their content. Set `min-height` instead of `height` on the body and container so the page can grow if needed.
 
-### 10. macOS WKWebView resource provider URL format
+### 10. WKWebView resource provider URL format
 
-Problem: On macOS, WKWebView sends resource requests as bare relative paths (`/css/style.css`, `/js/index.js`) instead of full custom-scheme URLs (`juce://juce.backend/css/style.css`). The commonly used pattern `url.fromFirstOccurrenceOf(getResourceProviderRoot(), ...)` fails because the URL does not contain the root prefix. It returns an empty string, causing all resource requests to fallback to `index.html`. The result is that CSS and JS files are not loaded — the UI appears as unstyled plain text with no interactivity.
-
-This is a macOS-specific issue. On Windows, WebView2 sends full URLs with the `https://juce.backend/` prefix.
-
-Diagnosis: Add `fprintf(stderr, ...)` logging in the resource provider to print the raw URL and the result of `fromFirstOccurrenceOf`. In Release builds, JUCE's `DBG()` macro is stripped, so use `fprintf(stderr, ...)` for debugging.
+Problem: WKWebView sends resource requests as bare relative paths (`/css/style.css`, `/js/index.js`) instead of full custom-scheme URLs. The commonly used pattern `url.fromFirstOccurrenceOf(getResourceProviderRoot(), ...)` fails — it returns an empty string, causing all resource requests to fallback to `index.html`. The UI appears as unstyled plain text with no interactivity.
 
 Solution: Do not rely on `fromFirstOccurrenceOf`. Instead, check whether the URL starts with the root prefix and handle both cases:
 
@@ -394,9 +395,7 @@ if (path.isEmpty())
     path = "index.html";
 ```
 
-This handles both macOS (bare `/css/style.css`) and Windows (`https://juce.backend/css/style.css`).
-
-Note: CloudWash avoids this issue because its HTML loads JS via `<script type="module" src="js/index.js">`. WKWebView's ES6 module loader resolves import URLs through a different code path that does include the full scheme prefix. But `<link rel="stylesheet">` and non-module `<script src>` use bare relative paths on macOS.
+Note: ES6 module `import` URLs go through a different WKWebView code path that does include the full scheme prefix, so module loading is unaffected. But `<link rel="stylesheet">` and non-module `<script src>` use bare relative paths.
 
 ### 11. Logic Pro stops calling processBlock on pause
 
@@ -404,7 +403,7 @@ Problem: When Logic Pro pauses playback, it stops calling `processBlock` entirel
 
 This is well-documented behavior, not a bug: https://forum.juce.com/t/process-block-on-pause/55088
 
-Solution: Implement the watchdog timer pattern described in the Visualization section above. `processBlock` updates an atomic timestamp; `timerCallback` detects staleness and drives Rust-side decay.
+Solution: Implement the watchdog timer pattern documented in `rust-auv2-docs/viz-architecture.md` (Layer 4). `processBlock` updates an atomic timestamp; `timerCallback` detects staleness and drives Rust-side decay.
 
 ### 12. COMPANY_NAME determines Logic Pro plugin grouping
 
@@ -441,56 +440,13 @@ This enables the pattern: put reusable JS components in `shared/ui/viz/`, refere
 - Rust static library adds zero runtime overhead (direct function call, no IPC, no serialization)
 - The 45-parameter loop in processBlock reads atomics and calls `cloudseed_set_parameter` per block (not per sample), negligible cost
 - WebView UI runs in a separate process/thread on macOS (WKWebView), does not affect audio thread
-- Timer callback at 30Hz for visualization updates. For plugins with visualization, the timer reads a Rust-side `SeqLock<VizFrame>` snapshot via FFI, serializes to JSON, and pushes to JS via `evaluateJavascript`. See the Visualization section below.
+- Timer callback at 30Hz for visualization updates. See `rust-auv2-docs/viz-architecture.md` for the full data flow.
 
 ---
 
-## Visualization Data Flow
+## Visualization
 
-For plugins with real-time visualization (spectrum, GR timeline, meters), the data flow is:
-
-```
-Audio thread (Rust) → SpectrumEngine/PeakMeter → VizFrame → SeqLock
-    ↓
-C++ Editor timerCallback (30Hz) → reads SeqLock → JSON → evaluateJavascript
-    ↓
-JS renderers (SpectrumAnalyzer / GrTimeline / Meter) → Canvas
-```
-
-Full architecture is documented in `rust-auv2-docs/viz-architecture.md`. The key points for every new plugin with visualization:
-
-### Temporal smoothing is in Rust, not JS
-
-All per-bin temporal smoothing happens in `viz-core::SpectrumEngine`, in linear power domain (not dB domain). JS renderers are stateless — they draw whatever data they receive, no ballistics.
-
-### Watchdog pattern for DAW pause detection
-
-Logic Pro stops calling `processBlock` when playback pauses (does not send silence blocks). Without detection, the C++ timer keeps pushing the last frozen frame to JS, and the spectrum never decays.
-
-Every plugin with visualization must implement this pattern:
-
-```cpp
-// PluginProcessor.h
-std::atomic<double> lastProcessBlockTime { 0.0 };
-
-// PluginProcessor.cpp — first line of processBlock
-lastProcessBlockTime.store(juce::Time::getMillisecondCounterHiRes(),
-                           std::memory_order_relaxed);
-
-// PluginEditor.cpp — timerCallback
-double elapsed = juce::Time::getMillisecondCounterHiRes()
-               - audioProcessor.lastProcessBlockTime.load(std::memory_order_relaxed);
-if (elapsed > 200.0)
-    audioProcessor.vizDecay();  // drives Rust-side decay
-```
-
-`vizDecay()` calls `SpectrumEngine::decay_to_silence()` which applies release-rate EMA decay to `smooth_power`, compensating for the timer/FFT frame rate difference via `release_coeff.powi(ceil(fft_frame_rate / 30))`.
-
-### Shared components
-
-Reusable Rust crate: `rust-dsp-crates/viz-core/` (SpectrumEngine, SeqLock, PeakMeter).
-
-Reusable JS renderers: `shared/ui/viz/` (spectrum.js, timeline.js, meter.js). Each plugin's CMakeLists references these via relative path (e.g. `../../shared/ui/viz/spectrum.js`). JUCE BinaryData symbols are based on filename only (not path), so the C++ resource provider does not need to change when files move between directories.
+For plugins with real-time visualization (spectrum, GR timeline, meters), see `rust-auv2-docs/viz-architecture.md` for the full architecture, code templates, and component API reference.
 
 ---
 
