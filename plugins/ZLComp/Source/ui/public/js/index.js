@@ -6,7 +6,6 @@ import { Meter } from "./viz/meter.js";
 const DPR = window.devicePixelRatio || 1;
 const STYLES = ['CLEAN', 'CLASSIC', 'OPTICAL', 'VOCAL'];
 const curveParams = { th: -32, rat: 3, knee: 8 };
-const curveSignal = { inDb: -72, reducedDb: -72, outDb: -72 };
 
 // ═══ 旋钮绑定 ═══
 let activeKnob = null, knobStartY = 0, knobStartVal = 0;
@@ -142,6 +141,12 @@ styleBtn.addEventListener('click', () => {
 
 // ═══ GR 可视化 ═══
 const grHistory = new Float32Array(80);
+const inHistory = new Float32Array(80);
+const reducedHistory = new Float32Array(80);
+const outHistory = new Float32Array(80);
+inHistory.fill(-72);
+reducedHistory.fill(-72);
+outHistory.fill(-72);
 const grValEl = document.getElementById('grVal');
 const meterInEl = document.getElementById('meterIn');
 const meterOutEl = document.getElementById('meterOut');
@@ -160,12 +165,21 @@ window.__zlcompViz = function(json, audioActive = true) {
     const nextIn = audioActive && Number.isFinite(d.in_db) ? clampDb(d.in_db) : -72;
     const nextOut = audioActive && Number.isFinite(d.out_db) ? clampDb(d.out_db) : -72;
     const nextReduced = audioActive ? clampDb(nextIn - gr) : -72;
-    curveSignal.inDb += (nextIn - curveSignal.inDb) * 0.35;
-    curveSignal.reducedDb += (nextReduced - curveSignal.reducedDb) * 0.35;
-    curveSignal.outDb += (nextOut - curveSignal.outDb) * 0.35;
+    const prevIn = inHistory[inHistory.length - 1] ?? -72;
+    const prevReduced = reducedHistory[reducedHistory.length - 1] ?? -72;
+    const prevOut = outHistory[outHistory.length - 1] ?? -72;
+    const smoothIn = prevIn + (nextIn - prevIn) * 0.35;
+    const smoothReduced = prevReduced + (nextReduced - prevReduced) * 0.35;
+    const smoothOut = prevOut + (nextOut - prevOut) * 0.35;
+    inHistory.copyWithin(0, 1);
+    reducedHistory.copyWithin(0, 1);
+    outHistory.copyWithin(0, 1);
+    inHistory[inHistory.length - 1] = smoothIn;
+    reducedHistory[reducedHistory.length - 1] = smoothReduced;
+    outHistory[outHistory.length - 1] = smoothOut;
 
-    meterInEl.style.height = levelPct(curveSignal.inDb) + '%';
-    meterOutEl.style.height = levelPct(curveSignal.outDb) + '%';
+    meterInEl.style.height = levelPct(smoothIn) + '%';
+    meterOutEl.style.height = levelPct(smoothOut) + '%';
 
     if (d.sr) srDisplay.textContent = (d.sr / 1000) + ' kHz';
     if (d.lat !== undefined) latDisplay.textContent = 'LATENCY: ' + d.lat + ' smp';
@@ -223,36 +237,6 @@ function drawCurve() {
     ctx.beginPath(); ctx.moveTo(dx(dMin), dy(comp(dMin)));
     for (let d = dMin; d <= dMax; d += 0.5) ctx.lineTo(dx(d), dy(comp(d)));
     ctx.strokeStyle = '#d4943e'; ctx.lineWidth = 1.8; ctx.stroke();
-
-    drawCurveLevel(ctx, p, w, dx, dy);
-}
-
-function drawCurveLevel(ctx, p, w, dx, dy) {
-    const inputDb = clampDb(curveSignal.inDb);
-    const reducedDb = clampDb(curveSignal.reducedDb);
-    if (inputDb <= -71.9 && reducedDb <= -71.9) return;
-
-    const x = dx(inputDb);
-    const yIn = dy(inputDb);
-    const yReduced = dy(reducedDb);
-    const yBase = p + w;
-    const barW = 7;
-
-    ctx.save();
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.fillStyle = 'rgba(75, 163, 212, 0.32)';
-    ctx.fillRect(x - barW * 0.5, Math.min(yReduced, yBase), barW, Math.abs(yBase - yReduced));
-
-    if (yIn < yReduced) {
-        ctx.fillStyle = 'rgba(235, 230, 205, 0.52)';
-        ctx.fillRect(x - barW * 0.5, yIn, barW, yReduced - yIn);
-    }
-
-    ctx.beginPath();
-    ctx.arc(x, yReduced, 3.2, 0, Math.PI * 2);
-    ctx.fillStyle = '#4ba3d4';
-    ctx.fill();
-    ctx.restore();
 }
 
 // ═══ GR Timeline ═══
@@ -269,14 +253,59 @@ function drawGR() {
 
     const n = grHistory.length;
     const px = 4, py = 4, pw = w - px*2, ph = h - py*2;
+    const xAt = i => px + (i / (n - 1)) * pw;
+    const yLevel = db => py + ph - levelPct(db) * 0.01 * ph;
+    const yGR = db => py + Math.min(1, db / 20) * ph;
 
-    ctx.beginPath(); ctx.moveTo(px, py);
-    for (let i = 0; i < n; i++) ctx.lineTo(px + (i/(n-1))*pw, py + (grHistory[i]/20)*ph);
-    ctx.lineTo(px+pw, py); ctx.closePath();
-    ctx.fillStyle = 'rgba(212,80,64,0.08)'; ctx.fill();
+    ctx.strokeStyle = 'rgba(75,163,212,0.05)';
+    ctx.lineWidth = 0.5;
+    for (let db = -60; db <= -12; db += 12) {
+        const y = yLevel(db);
+        ctx.beginPath();
+        ctx.moveTo(px, y);
+        ctx.lineTo(px + pw, y);
+        ctx.stroke();
+    }
 
     ctx.beginPath();
-    for (let i = 0; i < n; i++) { const x = px+(i/(n-1))*pw, y = py+(grHistory[i]/20)*ph; i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y); }
+    ctx.moveTo(px, py + ph);
+    for (let i = 0; i < n; i++) ctx.lineTo(xAt(i), yLevel(reducedHistory[i]));
+    ctx.lineTo(px + pw, py + ph);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(75, 163, 212, 0.20)';
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(px, yLevel(inHistory[0]));
+    for (let i = 0; i < n; i++) ctx.lineTo(xAt(i), yLevel(inHistory[i]));
+    for (let i = n - 1; i >= 0; i--) ctx.lineTo(xAt(i), yLevel(reducedHistory[i]));
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(235, 230, 205, 0.36)';
+    ctx.fill();
+
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+        const x = xAt(i), y = yLevel(inHistory[i]);
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = 'rgba(235, 230, 205, 0.55)';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+        const x = xAt(i), y = yLevel(reducedHistory[i]);
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = '#4ba3d4';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+        const x = xAt(i), y = yGR(grHistory[i]);
+        i === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    }
     ctx.strokeStyle = '#d45040'; ctx.lineWidth = 1.2; ctx.stroke();
 }
 
