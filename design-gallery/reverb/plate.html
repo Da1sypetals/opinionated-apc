@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Dragonfly Plate Reverb</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #2e2e2e;
+  --surface: #383838;
+  --surface-hl: #444;
+  --border: #4a4a4a;
+  --gold: #b2943b;
+  --gold-dim: #8a7030;
+  --green: #5a8a5e;
+  --green-dim: #3a6a3e;
+  --text: #e8e8e8;
+  --text-dim: #a8a8a8;
+  --radius: 6px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #222;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  font-family: 'Inter', sans-serif;
+  color: var(--text);
+}
+
+.plugin {
+  width: 675px;
+  height: 345px;
+  background: var(--bg);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  display: grid;
+  grid-template-columns: 90px 305px 1fr;
+  grid-template-rows: 110px 1fr;
+  gap: 8px;
+  padding: 8px;
+  box-shadow: 0 16px 50px rgba(0,0,0,0.7);
+}
+
+/* === HEADER 区域（跨全宽） === */
+.header-area {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+  position: relative;
+  padding-left: 140px;
+  align-items: stretch;
+  justify-content: flex-end;
+}
+
+/* Logo 文字（无盒子，直接定位） */
+.logo-text {
+  position: absolute;
+  top: 0px;
+  left: 0px;
+  color: var(--gold);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.1;
+  font-style: italic;
+  font-family: Georgia, serif;
+  z-index: 1;
+}
+
+/* 预设盒子 */
+.presets-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  position: relative;
+  width: fit-content;
+}
+
+.presets-box .panel-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.presets-grid {
+  display: grid;
+  grid-template-columns: 80px 80px;
+  gap: 3px 12px;
+}
+
+.preset-item {
+  font-size: 11px;
+  color: var(--text-dim);
+  padding: 2px 2px;
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.preset-item:hover { background: rgba(255,255,255,0.06); color: var(--text); }
+.preset-item.active { color: #fff; font-weight: 600; background: rgba(178,148,59,0.15); }
+
+/* 算法盒子 */
+.algorithm-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+}
+
+.algorithm-box .panel-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.algorithm-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.algorithm-item {
+  font-size: 11px;
+  color: var(--text-dim);
+  padding: 3px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.algorithm-item:hover { background: rgba(255,255,255,0.06); color: var(--text); }
+.algorithm-item.active { color: #fff; font-weight: 600; background: rgba(178,148,59,0.15); }
+
+/* === 下半部分 === */
+
+/* 滑块盒子 */
+.sliders-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 6px;
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+}
+
+.fader-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  gap: 4px;
+}
+
+.fader-label {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-align: center;
+  line-height: 1.2;
+  letter-spacing: 0.05em;
+}
+
+.fader-track {
+  flex: 1;
+  width: 24px;
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+
+.fader-groove {
+  width: 6px;
+  height: 100%;
+  background: rgba(0,0,0,0.4);
+  border-radius: 3px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.5);
+}
+
+.fader-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--gold);
+  border-radius: 3px;
+  opacity: 0.8;
+}
+
+.fader-handle {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 10px;
+  background: linear-gradient(180deg, #555 0%, #3a3a3a 100%);
+  border: 1px solid #666;
+  border-radius: 2px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+  cursor: ns-resize;
+}
+
+.fader-value {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+/* Spectrogram 盒子 */
+.spectrogram-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px;
+  position: relative;
+  overflow: hidden;
+}
+
+.spectrogram-inner {
+  width: 100%;
+  height: 100%;
+  background: #1a1a1a;
+  border-radius: 3px;
+  position: relative;
+}
+
+.spectrogram-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.spectrogram-y-axis {
+  position: absolute;
+  top: 8px;
+  left: 4px;
+  bottom: 18px;
+  display: flex;
+  flex-direction: column-reverse;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.spectrogram-y-label {
+  color: #999;
+  font-size: 9px;
+  text-align: right;
+  width: 38px;
+}
+
+.spectrogram-x-axis {
+  position: absolute;
+  bottom: 2px;
+  left: 44px;
+  right: 10px;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.spectrogram-x-label {
+  color: #999;
+  font-size: 9px;
+}
+
+/* 旋钮盒子 */
+.knobs-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 8px;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 6px;
+  align-items: center;
+  justify-items: center;
+}
+
+.knob-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  cursor: ns-resize;
+  user-select: none;
+}
+
+.knob-container svg {
+  filter: drop-shadow(0 1px 3px rgba(0,0,0,0.4));
+}
+
+.knob-label {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-dim);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.knob-value {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+</style>
+</head>
+<body>
+<div class="plugin">
+
+  <!-- Header 区域 -->
+  <div class="header-area">
+    <div class="logo-text">Dragonfly<br>Plate</div>
+
+    <div class="presets-box">
+      <div class="panel-label">Presets</div>
+      <div class="presets-grid">
+        <div class="preset-item">Abrupt Plate</div>
+        <div class="preset-item">Foil Tray</div>
+        <div class="preset-item active">Bright Plate</div>
+        <div class="preset-item">Metal Roof</div>
+        <div class="preset-item">Clear Plate</div>
+        <div class="preset-item">Narrow Tank</div>
+        <div class="preset-item">Dark Plate</div>
+        <div class="preset-item">Phat Tank</div>
+      </div>
+    </div>
+
+    <div class="algorithm-box">
+      <div class="panel-label">Reverb Type</div>
+      <div class="algorithm-list">
+        <div class="algorithm-item">Simple</div>
+        <div class="algorithm-item active">Nested</div>
+        <div class="algorithm-item">Tank</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 滑块区域 -->
+  <div class="sliders-box">
+    <div class="fader-col">
+      <div class="fader-label">Dry</div>
+      <div class="fader-track">
+        <div class="fader-groove">
+          <div class="fader-fill" style="height: 80%"></div>
+        </div>
+        <div class="fader-handle" style="bottom: calc(80% - 5px)"></div>
+      </div>
+      <div class="fader-value">80%</div>
+    </div>
+    <div class="fader-col">
+      <div class="fader-label">Wet</div>
+      <div class="fader-track">
+        <div class="fader-groove">
+          <div class="fader-fill" style="height: 20%"></div>
+        </div>
+        <div class="fader-handle" style="bottom: calc(20% - 5px)"></div>
+      </div>
+      <div class="fader-value">20%</div>
+    </div>
+  </div>
+
+  <!-- Spectrogram -->
+  <div class="spectrogram-box">
+    <div class="spectrogram-inner">
+      <canvas class="spectrogram-canvas" id="spectrogramCanvas"></canvas>
+      <div class="spectrogram-y-axis">
+        <div class="spectrogram-y-label">125 Hz</div>
+        <div class="spectrogram-y-label">250 Hz</div>
+        <div class="spectrogram-y-label">500 Hz</div>
+        <div class="spectrogram-y-label">1 kHz</div>
+        <div class="spectrogram-y-label">2 kHz</div>
+        <div class="spectrogram-y-label">4 kHz</div>
+        <div class="spectrogram-y-label">8 kHz</div>
+        <div class="spectrogram-y-label">16 kHz</div>
+      </div>
+      <div class="spectrogram-x-axis">
+        <div class="spectrogram-x-label">½s</div>
+        <div class="spectrogram-x-label">1s</div>
+        <div class="spectrogram-x-label">2s</div>
+        <div class="spectrogram-x-label">4s</div>
+        <div class="spectrogram-x-label">8s</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 旋钮区域 -->
+  <div class="knobs-box">
+    <!-- Row 1: gold knobs -->
+    <div class="knob-container" data-color="gold" data-value="0.5" data-min="50" data-max="150" data-unit="%" data-name="Width">
+      <svg viewBox="0 0 64 64" width="56" height="56">
+        <path class="knob-track" d="M12.2 51.8 A 28 28 0 1 1 51.8 51.8" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/>
+        <circle class="value-arc" cx="32" cy="32" r="28" fill="none" stroke="var(--gold)" stroke-width="6" stroke-linecap="round" transform="rotate(135 32 32)"/>
+      </svg>
+      <span class="knob-label">Width</span>
+      <span class="knob-value">100%</span>
+    </div>
+
+    <div class="knob-container" data-color="gold" data-value="0.0" data-min="0" data-max="100" data-unit=" ms" data-name="Predelay">
+      <svg viewBox="0 0 64 64" width="56" height="56">
+        <path class="knob-track" d="M12.2 51.8 A 28 28 0 1 1 51.8 51.8" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/>
+        <circle class="value-arc" cx="32" cy="32" r="28" fill="none" stroke="var(--gold)" stroke-width="6" stroke-linecap="round" transform="rotate(135 32 32)"/>
+      </svg>
+      <span class="knob-label">Predelay</span>
+      <span class="knob-value">0 ms</span>
+    </div>
+
+    <div class="knob-container" data-color="gold" data-value="0.03" data-min="0.1" data-max="10" data-unit=" s" data-name="Decay" data-decimals="1">
+      <svg viewBox="0 0 64 64" width="56" height="56">
+        <path class="knob-track" d="M12.2 51.8 A 28 28 0 1 1 51.8 51.8" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/>
+        <circle class="value-arc" cx="32" cy="32" r="28" fill="none" stroke="var(--gold)" stroke-width="6" stroke-linecap="round" transform="rotate(135 32 32)"/>
+      </svg>
+      <span class="knob-label">Decay</span>
+      <span class="knob-value">0.4 s</span>
+    </div>
+
+    <!-- Row 2: green knobs -->
+    <div class="knob-container" data-color="green" data-value="1.0" data-min="0" data-max="200" data-unit=" Hz" data-name="Low Cut">
+      <svg viewBox="0 0 64 64" width="56" height="56">
+        <path class="knob-track" d="M12.2 51.8 A 28 28 0 1 1 51.8 51.8" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/>
+        <circle class="value-arc" cx="32" cy="32" r="28" fill="none" stroke="var(--green)" stroke-width="6" stroke-linecap="round" transform="rotate(135 32 32)"/>
+      </svg>
+      <span class="knob-label">Low Cut</span>
+      <span class="knob-value">200 Hz</span>
+    </div>
+
+    <div class="knob-container" data-color="green" data-value="1.0" data-min="1000" data-max="16000" data-unit=" Hz" data-name="High Cut">
+      <svg viewBox="0 0 64 64" width="56" height="56">
+        <path class="knob-track" d="M12.2 51.8 A 28 28 0 1 1 51.8 51.8" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/>
+        <circle class="value-arc" cx="32" cy="32" r="28" fill="none" stroke="var(--green)" stroke-width="6" stroke-linecap="round" transform="rotate(135 32 32)"/>
+      </svg>
+      <span class="knob-label">High Cut</span>
+      <span class="knob-value">16000 Hz</span>
+    </div>
+
+    <div class="knob-container" data-color="green" data-value="0.8" data-min="1000" data-max="16000" data-unit=" Hz" data-name="Dampen">
+      <svg viewBox="0 0 64 64" width="56" height="56">
+        <path class="knob-track" d="M12.2 51.8 A 28 28 0 1 1 51.8 51.8" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/>
+        <circle class="value-arc" cx="32" cy="32" r="28" fill="none" stroke="var(--green)" stroke-width="6" stroke-linecap="round" transform="rotate(135 32 32)"/>
+      </svg>
+      <span class="knob-label">Dampen</span>
+      <span class="knob-value">13000 Hz</span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// === Knob 交互 ===
+class Knob {
+  constructor(el) {
+    this.el = el;
+    this.value = parseFloat(el.dataset.value) || 0.5;
+    this.arc = el.querySelector('.value-arc');
+    this.valueLabel = el.querySelector('.knob-value');
+    this.min = parseFloat(el.dataset.min) || 0;
+    this.max = parseFloat(el.dataset.max) || 1;
+    this.unit = el.dataset.unit || '';
+    this.isDragging = false;
+
+    el.addEventListener('mousedown', e => {
+      this.isDragging = true;
+      this.startY = e.clientY;
+      this.startVal = this.value;
+      document.body.style.cursor = 'ns-resize';
+      e.preventDefault();
+    });
+
+    window.addEventListener('mousemove', e => {
+      if (!this.isDragging) return;
+      const delta = (this.startY - e.clientY) * 0.005;
+      this.value = Math.min(Math.max(this.startVal + delta, 0), 1);
+      this.update();
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (this.isDragging) {
+        this.isDragging = false;
+        document.body.style.cursor = '';
+      }
+    });
+
+    this.update();
+  }
+
+  update() {
+    const circumference = 2 * Math.PI * 28;
+    const arcLength = circumference * 0.75;
+    const dashOffset = arcLength - (this.value * arcLength);
+    this.arc.style.strokeDasharray = `${arcLength} ${circumference}`;
+    this.arc.style.strokeDashoffset = dashOffset;
+
+    const displayVal = this.min + this.value * (this.max - this.min);
+    const decimals = parseInt(this.el.dataset.decimals || '0');
+    if (decimals > 0) {
+      this.valueLabel.textContent = displayVal.toFixed(decimals) + this.unit;
+    } else {
+      this.valueLabel.textContent = Math.round(displayVal) + this.unit;
+    }
+  }
+}
+
+// === Fader 交互 ===
+class Fader {
+  constructor(el) {
+    this.el = el;
+    this.handle = el.querySelector('.fader-handle');
+    this.fill = el.querySelector('.fader-fill');
+    this.valueLabel = el.closest('.fader-col').querySelector('.fader-value');
+    this.value = parseFloat(this.fill.style.height) / 100 || 0.5;
+    this.isDragging = false;
+
+    this.handle.addEventListener('mousedown', e => {
+      this.isDragging = true;
+      this.startY = e.clientY;
+      this.startVal = this.value;
+      document.body.style.cursor = 'ns-resize';
+      e.preventDefault();
+    });
+
+    window.addEventListener('mousemove', e => {
+      if (!this.isDragging) return;
+      const trackHeight = el.querySelector('.fader-groove').clientHeight;
+      const delta = (this.startY - e.clientY) / trackHeight;
+      this.value = Math.min(Math.max(this.startVal + delta, 0), 1);
+      this.update();
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (this.isDragging) {
+        this.isDragging = false;
+        document.body.style.cursor = '';
+      }
+    });
+  }
+
+  update() {
+    this.fill.style.height = (this.value * 100) + '%';
+    this.handle.style.bottom = `calc(${this.value * 100}% - 5px)`;
+    this.valueLabel.textContent = Math.round(this.value * 100) + '%';
+  }
+}
+
+// === Spectrogram ===
+function drawSpectrogram() {
+  const canvas = document.getElementById('spectrogramCanvas');
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width;
+  canvas.height = rect.height;
+  const ctx = canvas.getContext('2d');
+
+  const mL = 44, mT = 8, mR = 10, mB = 16;
+  const plotW = canvas.width - mL - mR;
+  const plotH = canvas.height - mT - mB;
+
+  for (let x = 0; x < plotW; x++) {
+    const t = Math.exp(x * Math.log(8.0 / 0.2) / plotW) * 0.2;
+    const decay = Math.exp(-t / 0.6);
+    for (let y = 0; y < plotH; y++) {
+      const freq = Math.exp(y * Math.log(16000 / 100) / plotH) * 100;
+      const freqFactor = Math.exp(-freq / 12000);
+      const amp = decay * freqFactor * (0.4 + 0.6 * Math.random());
+      const alpha = Math.min(amp * 0.7, 1.0);
+      if (alpha > 0.02) {
+        ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+        ctx.fillRect(mL + x, mT + plotH - y - 1, 1, 1);
+      }
+    }
+  }
+}
+
+// === 初始化 ===
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.knob-container').forEach(el => new Knob(el));
+  document.querySelectorAll('.fader-track').forEach(el => new Fader(el));
+  drawSpectrogram();
+
+  // 预设/算法点击
+  document.querySelectorAll('.preset-item').forEach(item => {
+    item.addEventListener('click', () => {
+      document.querySelectorAll('.preset-item').forEach(i => i.classList.remove('active'));
+      item.classList.add('active');
+    });
+  });
+  document.querySelectorAll('.algorithm-item').forEach(item => {
+    item.addEventListener('click', () => {
+      document.querySelectorAll('.algorithm-item').forEach(i => i.classList.remove('active'));
+      item.classList.add('active');
+    });
+  });
+});
+</script>
+</body>
+</html>

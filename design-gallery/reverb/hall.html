@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Dragonfly Hall Reverb</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #2e2e2e;
+  --surface: #383838;
+  --border: #4a4a4a;
+  --green: #529458;
+  --green-light: #6aaa70;
+  --text: #e8e8e8;
+  --text-dim: #a8a8a8;
+  --radius: 6px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #222;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  font-family: 'Inter', sans-serif;
+  color: var(--text);
+}
+
+.plugin {
+  width: 920px;
+  height: 345px;
+  background: var(--bg);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  display: grid;
+  grid-template-columns: 140px 150px 1fr 240px;
+  grid-template-rows: 110px 1fr;
+  gap: 6px;
+  padding: 6px;
+  box-shadow: 0 16px 50px rgba(0,0,0,0.7);
+}
+
+.box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+/* === Header === */
+.header-area {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 6px;
+  position: relative;
+  padding-left: 130px;
+  align-items: stretch;
+  justify-content: flex-end;
+}
+
+.logo-text {
+  position: absolute;
+  top: 0; left: 0;
+  color: var(--green-light);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.1;
+  font-style: italic;
+  font-family: Georgia, serif;
+}
+
+.bank-preset-box {
+  padding: 0;
+  display: flex;
+  overflow: hidden;
+  width: fit-content;
+}
+
+.bank-col {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 0 4px 4px;
+  gap: 2px;
+  justify-content: center;
+  width: 98px;
+  flex-shrink: 0;
+}
+
+.bank-tab {
+  font-size: 11px;
+  color: var(--text-dim);
+  padding: 3px 12px 3px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  text-align: right;
+  border-radius: 3px 0 0 3px;
+  background: transparent;
+}
+
+.bank-tab:hover { background: rgba(255,255,255,0.04); color: var(--text); }
+.bank-tab.active {
+  color: #fff;
+  font-weight: 600;
+  background: #2f2f2f;
+}
+
+.preset-col {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 10px;
+  gap: 2px;
+  border-left: 1px solid var(--border);
+  background: #2f2f2f;
+  justify-content: center;
+}
+
+.preset-item {
+  font-size: 11px;
+  color: var(--text-dim);
+  padding: 3px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+  min-width: 160px;
+}
+
+.preset-item:hover { background: rgba(255,255,255,0.06); color: var(--text); }
+.preset-item.active { color: #fff; font-weight: 600; background: rgba(82,148,88,0.15); }
+
+.diffuse-box {
+  padding: 6px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  align-items: center;
+  justify-items: center;
+  width: 240px;
+}
+
+/* === 下半部分 === */
+
+/* 滑块 */
+.sliders-box {
+  grid-column: 1;
+  padding: 6px 4px;
+  display: flex;
+  gap: 4px;
+  align-items: stretch;
+}
+
+.fader-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  gap: 3px;
+}
+
+.fader-label { font-size: 8px; font-weight: 600; color: var(--text-dim); text-align: center; line-height: 1.2; }
+.fader-track { flex: 1; width: 22px; position: relative; display: flex; justify-content: center; cursor: ns-resize; }
+.fader-groove { width: 6px; height: 100%; background: rgba(0,0,0,0.4); border-radius: 3px; position: relative; overflow: hidden; box-shadow: inset 0 1px 3px rgba(0,0,0,0.5); }
+.fader-fill { position: absolute; bottom: 0; left: 0; right: 0; background: var(--green); border-radius: 3px; opacity: 0.8; }
+.fader-handle { position: absolute; left: 50%; transform: translateX(-50%); width: 22px; height: 10px; background: linear-gradient(180deg, #555, #3a3a3a); border: 1px solid #666; border-radius: 2px; box-shadow: 0 2px 4px rgba(0,0,0,0.4); cursor: ns-resize; }
+.fader-value { font-size: 9px; color: var(--text-dim); }
+
+/* 左中旋钮 (Size/Width/Predelay/Decay) */
+.left-knobs-box {
+  grid-column: 2;
+  padding: 6px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 4px;
+  align-items: center;
+  justify-items: center;
+}
+
+/* Spectrogram */
+.spectrogram-box {
+  grid-column: 3;
+  padding: 5px;
+  position: relative;
+  overflow: hidden;
+}
+
+.spectrogram-inner { width: 100%; height: 100%; background: #1a1a1a; border-radius: 3px; position: relative; }
+.spectrogram-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+.spectrogram-y-axis { position: absolute; top: 6px; left: 3px; bottom: 16px; display: flex; flex-direction: column-reverse; justify-content: space-between; pointer-events: none; }
+.spectrogram-y-label { color: #999; font-size: 8px; text-align: right; width: 34px; }
+.spectrogram-x-axis { position: absolute; bottom: 1px; left: 40px; right: 8px; display: flex; justify-content: space-between; pointer-events: none; }
+.spectrogram-x-label { color: #999; font-size: 8px; }
+
+/* EQ 旋钮 (High/Low Cut/Cross/Mult) */
+.eq-box {
+  grid-column: 4;
+  padding: 6px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: 1fr 1fr;
+  gap: 4px;
+  align-items: center;
+  justify-items: center;
+}
+
+/* === 旋钮 (Plate 设计语言: arc only, no center fill) === */
+.knob-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  cursor: ns-resize;
+  user-select: none;
+}
+
+.knob-container svg { filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3)); }
+.knob-label { font-size: 8px; font-weight: 600; color: var(--text-dim); letter-spacing: 0.03em; text-transform: uppercase; text-align: center; }
+.knob-value { font-size: 9px; color: var(--text-dim); }
+</style>
+</head>
+<body>
+<div class="plugin">
+
+  <!-- Header -->
+  <div class="header-area">
+    <div class="logo-text">Dragonfly<br>Hall</div>
+
+    <div class="box bank-preset-box">
+      <div class="bank-col" id="bankCol">
+        <div class="bank-tab" data-bank="0">Rooms</div>
+        <div class="bank-tab" data-bank="1">Studios</div>
+        <div class="bank-tab active" data-bank="2">Small Halls</div>
+        <div class="bank-tab" data-bank="3">Medium Halls</div>
+        <div class="bank-tab" data-bank="4">Large Halls</div>
+      </div>
+      <div class="preset-col" id="presetCol">
+        <div class="preset-item">Small Bright Hall</div>
+        <div class="preset-item active">Small Clear Hall</div>
+        <div class="preset-item">Small Dark Hall</div>
+        <div class="preset-item">Small Percussion Hall</div>
+        <div class="preset-item">Small Vocal Hall</div>
+      </div>
+    </div>
+
+    <div class="box diffuse-box">
+      <div class="knob-container" data-value="0.8" data-min="0" data-max="100" data-unit="%">
+        <svg viewBox="0 0 64 64" width="46" height="46"><path class="knob-track" d="M12.2 51.8 A 28 28 0 1 1 51.8 51.8" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/><circle class="value-arc" cx="32" cy="32" r="28" fill="none" stroke="var(--green)" stroke-width="6" stroke-linecap="round" transform="rotate(135 32 32)"/></svg>
+        <span class="knob-label">Diffuse</span><span class="knob-value">80%</span>
+      </div>
+      <div class="knob-container" data-value="0.1" data-min="0" data-max="100" data-unit="%">
+        <svg viewBox="0 0 64 64" width="46" height="46"><path class="knob-track" d="M12.2 51.8 A 28 28 0 1 1 51.8 51.8" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/><circle class="value-arc" cx="32" cy="32" r="28" fill="none" stroke="var(--green)" stroke-width="6" stroke-linecap="round" transform="rotate(135 32 32)"/></svg>
+        <span class="knob-label">Mod</span><span class="knob-value">10%</span>
+      </div>
+      <div class="knob-container" data-value="0.21" data-min="0" data-max="10" data-unit=" Hz" data-decimals="2">
+        <svg viewBox="0 0 64 64" width="46" height="46"><path class="knob-track" d="M12.2 51.8 A 28 28 0 1 1 51.8 51.8" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/><circle class="value-arc" cx="32" cy="32" r="28" fill="none" stroke="var(--green)" stroke-width="6" stroke-linecap="round" transform="rotate(135 32 32)"/></svg>
+        <span class="knob-label">Spin</span><span class="knob-value">2.1 Hz</span>
+      </div>
+      <div class="knob-container" data-value="0.625" data-min="0" data-max="40" data-unit=" ms" data-decimals="1">
+        <svg viewBox="0 0 64 64" width="46" height="46"><path class="knob-track" d="M12.2 51.8 A 28 28 0 1 1 51.8 51.8" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/><circle class="value-arc" cx="32" cy="32" r="28" fill="none" stroke="var(--green)" stroke-width="6" stroke-linecap="round" transform="rotate(135 32 32)"/></svg>
+        <span class="knob-label">Wander</span><span class="knob-value">25 ms</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sliders -->
+  <div class="box sliders-box">
+    <div class="fader-col"><div class="fader-label">Dry</div><div class="fader-track"><div class="fader-groove"><div class="fader-fill" style="height:80%"></div></div><div class="fader-handle" style="bottom:calc(80% - 5px)"></div></div><div class="fader-value">80%</div></div>
+    <div class="fader-col"><div class="fader-label">Early</div><div class="fader-track"><div class="fader-groove"><div class="fader-fill" style="height:10%"></div></div><div class="fader-handle" style="bottom:calc(10% - 5px)"></div></div><div class="fader-value">10%</div></div>
+    <div class="fader-col"><div class="fader-label">E.Send</div><div class="fader-track"><div class="fader-groove"><div class="fader-fill" style="height:20%"></div></div><div class="fader-handle" style="bottom:calc(20% - 5px)"></div></div><div class="fader-value">20%</div></div>
+    <div class="fader-col"><div class="fader-label">Late</div><div class="fader-track"><div class="fader-groove"><div class="fader-fill" style="height:20%"></div></div><div class="fader-handle" style="bottom:calc(20% - 5px)"></div></div><div class="fader-value">20%</div></div>
+  </div>
+
+  <!-- Left Knobs -->
+  <div class="box left-knobs-box">
+    <div class="knob-container" data-value="0.6" data-min="10" data-max="60" data-unit=" m">
+      <svg viewBox="0 0 64 64" width="52" height="52"><path class="knob-track" d="M12.2 51.8 A 28 28 0 1 1 51.8 51.8" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/><circle class="value-arc" cx="32" cy="32" r="28" fill="none" stroke="var(--green)" stroke-width="6" stroke-linecap="round" transform="rotate(135 32 32)"/></svg>
+      <span class="knob-label">Size</span><span class="knob-value">40 m</span>
+    </div>
+    <div class="knob-container" data-value="0.6" data-min="50" data-max="150" data-unit="%">
+      <svg viewBox="0 0 64 64" width="52" height="52"><path class="knob-track" d="M12.2 51.8 A 28 28 0 1 1 51.8 51.8" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/><circle class="value-arc" cx="32" cy="32" r="28" fill="none" stroke="var(--green)" stroke-width="6" stroke-linecap="round" transform="rotate(135 32 32)"/></svg>
+      <span class="knob-label">Width</span><span class="knob-value">80%</span>
+    </div>
+    <div class="knob-container" data-value="0.12" data-min="0" data-max="100" data-unit=" ms">
+      <svg viewBox="0 0 64 64" width="52" height="52"><path class="knob-track" d="M12.2 51.8 A 28 28 0 1 1 51.8 51.8" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/><circle class="value-arc" cx="32" cy="32" r="28" fill="none" stroke="var(--green)" stroke-width="6" stroke-linecap="round" transform="rotate(135 32 32)"/></svg>
+      <span class="knob-label">Predelay</span><span class="knob-value">12 ms</span>
+    </div>
+    <div class="knob-container" data-value="0.232" data-min="0.1" data-max="10" data-unit=" s" data-decimals="1">
+      <svg viewBox="0 0 64 64" width="52" height="52"><path class="knob-track" d="M12.2 51.8 A 28 28 0 1 1 51.8 51.8" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/><circle class="value-arc" cx="32" cy="32" r="28" fill="none" stroke="var(--green)" stroke-width="6" stroke-linecap="round" transform="rotate(135 32 32)"/></svg>
+      <span class="knob-label">Decay</span><span class="knob-value">2.4 s</span>
+    </div>
+  </div>
+
+  <!-- Spectrogram -->
+  <div class="box spectrogram-box">
+    <div class="spectrogram-inner">
+      <canvas class="spectrogram-canvas" id="spectrogramCanvas"></canvas>
+      <div class="spectrogram-y-axis">
+        <div class="spectrogram-y-label">125 Hz</div><div class="spectrogram-y-label">250 Hz</div><div class="spectrogram-y-label">500 Hz</div><div class="spectrogram-y-label">1 kHz</div><div class="spectrogram-y-label">2 kHz</div><div class="spectrogram-y-label">4 kHz</div><div class="spectrogram-y-label">8 kHz</div><div class="spectrogram-y-label">16 kHz</div>
+      </div>
+      <div class="spectrogram-x-axis">
+        <div class="spectrogram-x-label">½s</div><div class="spectrogram-x-label">1s</div><div class="spectrogram-x-label">2s</div><div class="spectrogram-x-label">4s</div><div class="spectrogram-x-label">8s</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EQ Knobs -->
+  <div class="box eq-box">
+    <div class="knob-container" data-value="0.35" data-min="1000" data-max="16000" data-unit=" Hz">
+      <svg viewBox="0 0 64 64" width="46" height="46"><path class="knob-track" d="M12.2 51.8 A 28 28 0 1 1 51.8 51.8" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/><circle class="value-arc" cx="32" cy="32" r="28" fill="none" stroke="var(--green)" stroke-width="6" stroke-linecap="round" transform="rotate(135 32 32)"/></svg>
+      <span class="knob-label">High Cut</span><span class="knob-value">6250 Hz</span>
+    </div>
+    <div class="knob-container" data-value="0.24" data-min="1000" data-max="16000" data-unit=" Hz">
+      <svg viewBox="0 0 64 64" width="46" height="46"><path class="knob-track" d="M12.2 51.8 A 28 28 0 1 1 51.8 51.8" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/><circle class="value-arc" cx="32" cy="32" r="28" fill="none" stroke="var(--green)" stroke-width="6" stroke-linecap="round" transform="rotate(135 32 32)"/></svg>
+      <span class="knob-label">High Cross</span><span class="knob-value">4600 Hz</span>
+    </div>
+    <div class="knob-container" data-value="0.1" data-min="0.2" data-max="1.2" data-unit=" X" data-decimals="1">
+      <svg viewBox="0 0 64 64" width="46" height="46"><path class="knob-track" d="M12.2 51.8 A 28 28 0 1 1 51.8 51.8" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/><circle class="value-arc" cx="32" cy="32" r="28" fill="none" stroke="var(--green)" stroke-width="6" stroke-linecap="round" transform="rotate(135 32 32)"/></svg>
+      <span class="knob-label">High Mult</span><span class="knob-value">0.3 X</span>
+    </div>
+    <div class="knob-container" data-value="0.02" data-min="0" data-max="200" data-unit=" Hz">
+      <svg viewBox="0 0 64 64" width="46" height="46"><path class="knob-track" d="M12.2 51.8 A 28 28 0 1 1 51.8 51.8" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/><circle class="value-arc" cx="32" cy="32" r="28" fill="none" stroke="var(--green)" stroke-width="6" stroke-linecap="round" transform="rotate(135 32 32)"/></svg>
+      <span class="knob-label">Low Cut</span><span class="knob-value">4 Hz</span>
+    </div>
+    <div class="knob-container" data-value="0.5" data-min="200" data-max="1200" data-unit=" Hz">
+      <svg viewBox="0 0 64 64" width="46" height="46"><path class="knob-track" d="M12.2 51.8 A 28 28 0 1 1 51.8 51.8" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/><circle class="value-arc" cx="32" cy="32" r="28" fill="none" stroke="var(--green)" stroke-width="6" stroke-linecap="round" transform="rotate(135 32 32)"/></svg>
+      <span class="knob-label">Low Cross</span><span class="knob-value">700 Hz</span>
+    </div>
+    <div class="knob-container" data-value="0.85" data-min="0.5" data-max="2.5" data-unit=" X" data-decimals="1">
+      <svg viewBox="0 0 64 64" width="46" height="46"><path class="knob-track" d="M12.2 51.8 A 28 28 0 1 1 51.8 51.8" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/><circle class="value-arc" cx="32" cy="32" r="28" fill="none" stroke="var(--green)" stroke-width="6" stroke-linecap="round" transform="rotate(135 32 32)"/></svg>
+      <span class="knob-label">Low Mult</span><span class="knob-value">2.2 X</span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+class Knob {
+  constructor(el) {
+    this.el = el; this.value = parseFloat(el.dataset.value) || 0.5;
+    this.arc = el.querySelector('.value-arc'); this.valueLabel = el.querySelector('.knob-value');
+    this.min = parseFloat(el.dataset.min) || 0; this.max = parseFloat(el.dataset.max) || 1;
+    this.unit = el.dataset.unit || ''; this.isDragging = false;
+    el.addEventListener('mousedown', e => { this.isDragging = true; this.startY = e.clientY; this.startVal = this.value; document.body.style.cursor = 'ns-resize'; e.preventDefault(); });
+    window.addEventListener('mousemove', e => { if (!this.isDragging) return; this.value = Math.min(Math.max(this.startVal + (this.startY - e.clientY) * 0.005, 0), 1); this.update(); });
+    window.addEventListener('mouseup', () => { if (this.isDragging) { this.isDragging = false; document.body.style.cursor = ''; } });
+    this.update();
+  }
+  update() {
+    const c = 2 * Math.PI * 28, a = c * 0.75;
+    this.arc.style.strokeDasharray = `${a} ${c}`;
+    this.arc.style.strokeDashoffset = a - (this.value * a);
+    if (this.valueLabel) { const v = this.min + this.value * (this.max - this.min); const d = parseInt(this.el.dataset.decimals || '0'); this.valueLabel.textContent = (d > 0 ? v.toFixed(d) : Math.round(v)) + this.unit; }
+  }
+}
+
+class Fader {
+  constructor(el) {
+    this.el = el; this.handle = el.querySelector('.fader-handle'); this.fill = el.querySelector('.fader-fill');
+    this.valueLabel = el.closest('.fader-col').querySelector('.fader-value');
+    this.value = parseFloat(this.fill.style.height) / 100 || 0.5; this.isDragging = false;
+    this.handle.addEventListener('mousedown', e => { this.isDragging = true; this.startY = e.clientY; this.startVal = this.value; document.body.style.cursor = 'ns-resize'; e.preventDefault(); });
+    window.addEventListener('mousemove', e => { if (!this.isDragging) return; const h = el.querySelector('.fader-groove').clientHeight; this.value = Math.min(Math.max(this.startVal + (this.startY - e.clientY) / h, 0), 1); this.update(); });
+    window.addEventListener('mouseup', () => { if (this.isDragging) { this.isDragging = false; document.body.style.cursor = ''; } });
+  }
+  update() { this.fill.style.height = (this.value * 100) + '%'; this.handle.style.bottom = `calc(${this.value * 100}% - 5px)`; this.valueLabel.textContent = Math.round(this.value * 100) + '%'; }
+}
+
+function drawSpectrogram() {
+  const canvas = document.getElementById('spectrogramCanvas');
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width; canvas.height = rect.height;
+  const ctx = canvas.getContext('2d');
+  const mL = 40, mT = 6, mR = 8, mB = 14;
+  const plotW = canvas.width - mL - mR, plotH = canvas.height - mT - mB;
+  for (let x = 0; x < plotW; x++) {
+    const t = Math.exp(x * Math.log(40) / plotW) * 0.2;
+    const decay = Math.exp(-t / 1.5);
+    for (let y = 0; y < plotH; y++) {
+      const freq = Math.exp(y * Math.log(160) / plotH) * 100;
+      const amp = decay * Math.exp(-freq / 10000) * (0.4 + 0.6 * Math.random());
+      if (amp > 0.03) { ctx.fillStyle = `rgba(255,255,255,${Math.min(amp*0.7,1)})`; ctx.fillRect(mL+x, mT+plotH-y-1, 1, 1); }
+    }
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.knob-container').forEach(el => new Knob(el));
+  document.querySelectorAll('.fader-track').forEach(el => new Fader(el));
+  drawSpectrogram();
+  // Bank/Preset 逻辑
+  const bankPresets = {
+    0: ['Bright Room', 'Clear Room', 'Dark Room', 'Small Chamber', 'Large Chamber'],
+    1: ['Acoustic Studio', 'Electric Studio', 'Percussion Studio', 'Piano Studio', 'Vocal Studio'],
+    2: ['Small Bright Hall', 'Small Clear Hall', 'Small Dark Hall', 'Small Percussion Hall', 'Small Vocal Hall'],
+    3: ['Medium Bright Hall', 'Medium Clear Hall', 'Medium Dark Hall', 'Medium Percussion Hall', 'Medium Vocal Hall'],
+    4: ['Large Bright Hall', 'Large Clear Hall', 'Large Dark Hall', 'Large Vocal Hall', 'Great Hall'],
+  };
+
+  document.querySelectorAll('.bank-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.bank-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const bankIdx = parseInt(tab.dataset.bank);
+      const col = document.getElementById('presetCol');
+      col.innerHTML = bankPresets[bankIdx].map((name, i) =>
+        `<div class="preset-item${i === 0 ? ' active' : ''}">${name}</div>`
+      ).join('');
+      col.querySelectorAll('.preset-item').forEach(i => {
+        i.addEventListener('click', () => { col.querySelectorAll('.preset-item').forEach(x => x.classList.remove('active')); i.classList.add('active'); });
+      });
+    });
+  });
+  document.querySelectorAll('.preset-item').forEach(i => { i.addEventListener('click', () => { document.querySelectorAll('.preset-item').forEach(x => x.classList.remove('active')); i.classList.add('active'); }); });
+});
+</script>
+</body>
+</html>

@@ -430,6 +430,21 @@ Fact: JUCE BinaryData symbols are derived from the **filename only**, ignoring t
 
 This enables the pattern: put reusable JS components in `shared/ui/viz/`, reference them from each plugin's CMakeLists.txt, and the C++ code remains identical across plugins.
 
+### 16. Width jitter in dynamic content containers
+
+Problem: A container using `width: fit-content` or flex auto-sizing changes width when its content changes (e.g., switching between tabs/presets with different text lengths). This causes visible layout twitching.
+
+Example: A bank/preset tab list where "Medium Halls" is 2px wider than "Rooms", causing the entire box to resize on every tab click.
+
+Solution: Fix the width of the column that contains variable-length text. Use `width: <fixed>px; flex-shrink: 0` on the text column so it never resizes regardless of content. Use a Playwright script to click through all states and assert the container width is constant:
+
+```python
+for tab in tabs:
+    tab.click()
+    widths.append(box.getBoundingClientRect().width)
+assert len(set(widths)) == 1  # all widths identical
+```
+
 ---
 
 ## Performance Characteristics
