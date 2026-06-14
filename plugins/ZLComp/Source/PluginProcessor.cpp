@@ -98,25 +98,30 @@ void ZLCompAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce:
     }
 
     auto numSamples = buffer.getNumSamples();
+    if (numSamples == 0)
+        return;
+
     auto numInputCh = getTotalNumInputChannels();
     auto numOutputCh = getTotalNumOutputChannels();
 
-    auto* inL = buffer.getReadPointer(0);
-    auto* inR = numInputCh > 1 ? buffer.getReadPointer(1) : inL;
-
     if (numOutputCh == 1)
     {
-        juce::AudioBuffer<float> tmpOut(2, numSamples);
-        zlcomp_process(dspEngine, inL, inR,
-                       tmpOut.getWritePointer(0), tmpOut.getWritePointer(1),
+        juce::AudioBuffer<float> rightBuffer(1, numSamples);
+        rightBuffer.copyFrom(0, 0, buffer, 0, 0, numSamples);
+        zlcomp_process(dspEngine,
+                       buffer.getWritePointer(0),
+                       rightBuffer.getWritePointer(0),
                        static_cast<uint32_t>(numSamples));
-        buffer.copyFrom(0, 0, tmpOut, 0, 0, numSamples);
     }
     else
     {
-        auto* outL = buffer.getWritePointer(0);
-        auto* outR = buffer.getWritePointer(1);
-        zlcomp_process(dspEngine, inL, inR, outL, outR, static_cast<uint32_t>(numSamples));
+        if (numInputCh == 1)
+            buffer.copyFrom(1, 0, buffer, 0, 0, numSamples);
+
+        zlcomp_process(dspEngine,
+                       buffer.getWritePointer(0),
+                       buffer.getWritePointer(1),
+                       static_cast<uint32_t>(numSamples));
     }
 }
 

@@ -69,26 +69,14 @@ pub extern "C" fn zlcomp_set_parameter(engine: *mut ZLCompEngine, param_index: u
 #[unsafe(no_mangle)]
 pub extern "C" fn zlcomp_process(
     engine: *mut ZLCompEngine,
-    in_l: *const f32,
-    in_r: *const f32,
-    out_l: *mut f32,
-    out_r: *mut f32,
+    main_l: *mut f32,
+    main_r: *mut f32,
     num_samples: u32,
 ) {
     let engine = unsafe { &mut *engine };
     let n = num_samples as usize;
-    let output_l = unsafe { std::slice::from_raw_parts_mut(out_l, n) };
-    let output_r = unsafe { std::slice::from_raw_parts_mut(out_r, n) };
-
-    // 当 in != out 时，先复制输入到输出（避免同时创建 &[] 和 &mut[] 的 UB）
-    if in_l != out_l as *const f32 {
-        let input_l = unsafe { std::slice::from_raw_parts(in_l, n) };
-        output_l.copy_from_slice(input_l);
-    }
-    if in_r != out_r as *const f32 {
-        let input_r = unsafe { std::slice::from_raw_parts(in_r, n) };
-        output_r.copy_from_slice(input_r);
-    }
+    let output_l = unsafe { std::slice::from_raw_parts_mut(main_l, n) };
+    let output_r = unsafe { std::slice::from_raw_parts_mut(main_r, n) };
 
     engine.input_db = peak_db(output_l, output_r);
     engine.controller.process(output_l, output_r);
