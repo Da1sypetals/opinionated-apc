@@ -15,6 +15,10 @@ function logMid(v, xMin, xMax, xMid, shift) {
     return raw + shift;
 }
 
+function reversedLogMid(v, xMin, xMax, xMid, shift) {
+    return -logMid(1 - v, xMin, xMax, xMid, shift);
+}
+
 function skew(v, min, max, s) {
     return min + (max - min) * Math.pow(v, 1 / s);
 }
@@ -24,7 +28,7 @@ const STYLES = ['CLEAN', 'CLASSIC', 'OPTICAL', 'VOCAL'];
 export function denormalize(pid, norm) {
     const v = Math.max(0, Math.min(1, norm));
     switch (pid) {
-        case 'threshold': return linearMid(v, -100, 0, -32);
+        case 'threshold': return reversedLogMid(v, 1, 61, 33, -1);
         case 'ratio':     return logMid(v, 1, 100, 3, 0);
         case 'knee':      return skew(v, 0, 32, 0.5);
         case 'attack':    return logMid(v, 20, 1020, 120, -20);

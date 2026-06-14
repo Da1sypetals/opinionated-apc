@@ -5,4 +5,4 @@ edition = "2024"
 
 [dependencies]
 libm = "0.2.16"
-viz-core = { path = "../../viz-core" }
+viz-core = { path = "../../../shared/viz-core" }

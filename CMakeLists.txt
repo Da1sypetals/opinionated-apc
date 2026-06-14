@@ -20,6 +20,18 @@ add_subdirectory(_tools/JUCE)
 # ============================================
 # 插件
 # ============================================
-add_subdirectory(plugins/CloudSeed)
-add_subdirectory(plugins/DeBess)
-add_subdirectory(plugins/ZLComp)
+option(APC_BUILD_ONLY_CLOUDSEED "Build only CloudSeed" OFF)
+option(APC_BUILD_ONLY_DEBESS "Build only DeBess" OFF)
+option(APC_BUILD_ONLY_ZLCOMP "Build only ZLComp" OFF)
+
+if(APC_BUILD_ONLY_CLOUDSEED)
+    add_subdirectory(plugins/CloudSeed)
+elseif(APC_BUILD_ONLY_DEBESS)
+    add_subdirectory(plugins/DeBess)
+elseif(APC_BUILD_ONLY_ZLCOMP)
+    add_subdirectory(plugins/ZLComp)
+else()
+    add_subdirectory(plugins/CloudSeed)
+    add_subdirectory(plugins/DeBess)
+    add_subdirectory(plugins/ZLComp)
+endif()

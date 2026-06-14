@@ -1,16 +1,21 @@
-#!/usr/bin/env python3
 import argparse
+import os
+import plistlib
 import subprocess
 import sys
-import os
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 BUILD_DIR = ROOT / "build"
 PLUGIN_NAME = "CloudSeed"
+PLUGIN_CODE = "CSed"
+MANUFACTURER_CODE = "Nfld"
 AU_COMPONENT = BUILD_DIR / f"plugins/{PLUGIN_NAME}/{PLUGIN_NAME}_artefacts/Release/AU/{PLUGIN_NAME}.component"
 STANDALONE_APP = BUILD_DIR / f"plugins/{PLUGIN_NAME}/{PLUGIN_NAME}_artefacts/Release/Standalone/{PLUGIN_NAME}.app"
 INSTALL_DIR = Path.home() / "Library/Audio/Plug-Ins/Components"
+LOGIC_PREF = Path.home() / "Library/Preferences/com.apple.logic10.plist"
+AUDIO_COMPONENT_CACHE = Path.home() / "Library/Preferences/com.apple.audio.AudioComponentCache.plist"
+AU_CACHE_DIR = Path.home() / "Library/Caches/AudioUnitCache"
 
 def nproc():
     return os.cpu_count() or 4
@@ -19,11 +24,35 @@ def run(cmd, **kwargs):
     print(f"$ {' '.join(str(c) for c in cmd)}")
     subprocess.run(cmd, check=True, **kwargs)
 
+def process_exists(name):
+    result = subprocess.run(["pgrep", "-x", name], capture_output=True, text=True)
+    if result.stdout.strip():
+        print(result.stdout, end="")
+    if result.stderr:
+        print(result.stderr, end="", file=sys.stderr)
+    return result.returncode == 0
+
+def remove_existing(path):
+    if path.exists():
+        run(["rm", "-rf", str(path)])
+    else:
+        print(f"Skip missing path: {path}")
+
+def logic_cache_key_exists():
+    if not LOGIC_PREF.exists():
+        return False
+    with LOGIC_PREF.open("rb") as f:
+        prefs = plistlib.load(f)
+    return f"aufx-{PLUGIN_CODE}-{MANUFACTURER_CODE}" in prefs
+
 def do_build(standalone_only=False, au_only=False):
     BUILD_DIR.mkdir(exist_ok=True)
     run(["cmake", "-B", str(BUILD_DIR),
          "-DCMAKE_BUILD_TYPE=Release",
-         "-DCMAKE_OSX_ARCHITECTURES=arm64"],
+         "-DCMAKE_OSX_ARCHITECTURES=arm64",
+         "-DAPC_BUILD_ONLY_CLOUDSEED=ON",
+         "-DAPC_BUILD_ONLY_DEBESS=OFF",
+         "-DAPC_BUILD_ONLY_ZLCOMP=OFF"],
         cwd=str(ROOT))
 
     targets = []
@@ -57,17 +86,23 @@ def do_install():
     print(f"\nInstalled to {dest}")
 
 def do_clear():
-    subprocess.run(["killall", "-9", "AudioComponentRegistrar"])
-    subprocess.run(["defaults", "delete", "com.apple.logic10", "aufx-CSed-Nfld"])
-    subprocess.run(["rm", "-f", str(Path.home() / "Library/Preferences/com.apple.audio.AudioComponentCache.plist")])
-    subprocess.run(["rm", "-rf", str(Path.home() / "Library/Caches/AudioUnitCache")])
+    if process_exists("AudioComponentRegistrar"):
+        run(["killall", "-9", "AudioComponentRegistrar"])
+    else:
+        print("Skip stopped process: AudioComponentRegistrar")
+
+    if logic_cache_key_exists():
+        run(["defaults", "delete", "com.apple.logic10", f"aufx-{PLUGIN_CODE}-{MANUFACTURER_CODE}"])
+    else:
+        print(f"Skip missing Logic AU cache key: aufx-{PLUGIN_CODE}-{MANUFACTURER_CODE}")
+
+    remove_existing(AUDIO_COMPONENT_CACHE)
+    remove_existing(AU_CACHE_DIR)
     print("\nCaches cleared. Restart Logic Pro to rescan.")
 
 def do_validate():
     print("Running auval...")
-    ret = subprocess.run(["auval", "-v", "aufx", "CSed", "Nfld"])
-    if ret.returncode != 0:
-        sys.exit(1)
+    run(["auval", "-v", "aufx", PLUGIN_CODE, MANUFACTURER_CODE])
 
 def cmd_build(args):
     do_build(standalone_only=args.standalone, au_only=args.au_only)
@@ -99,7 +134,7 @@ def main():
     sub.add_parser("install", help="Install AU to system plugin directory").set_defaults(func=cmd_install)
     sub.add_parser("clear", help="Clear AU caches (system + Logic Pro)").set_defaults(func=cmd_clear)
     sub.add_parser("validate", help="Run auval validation").set_defaults(func=cmd_validate)
-    sub.add_parser("all", help="Build AU → install → clear caches → validate").set_defaults(func=cmd_all)
+    sub.add_parser("all", help="Build AU -> install -> clear caches -> validate").set_defaults(func=cmd_all)
 
     args = parser.parse_args()
     args.func(args)

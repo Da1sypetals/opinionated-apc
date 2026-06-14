@@ -5,6 +5,7 @@ import { Meter } from "./viz/meter.js";
 
 const DPR = window.devicePixelRatio || 1;
 const STYLES = ['CLEAN', 'CLASSIC', 'OPTICAL', 'VOCAL'];
+const DB_FLOOR = -60;
 const curveParams = { th: -32, rat: 3, knee: 8 };
 
 // ═══ 旋钮绑定 ═══
@@ -144,9 +145,9 @@ const grHistory = new Float32Array(80);
 const inHistory = new Float32Array(80);
 const reducedHistory = new Float32Array(80);
 const outHistory = new Float32Array(80);
-inHistory.fill(-72);
-reducedHistory.fill(-72);
-outHistory.fill(-72);
+inHistory.fill(DB_FLOOR);
+reducedHistory.fill(DB_FLOOR);
+outHistory.fill(DB_FLOOR);
 const grValEl = document.getElementById('grVal');
 const meterInEl = document.getElementById('meterIn');
 const meterOutEl = document.getElementById('meterOut');
@@ -157,17 +158,18 @@ window.__zlcompViz = function(json, audioActive = true) {
     let d;
     try { d = JSON.parse(json); } catch(e) { return; }
 
-    const gr = audioActive ? Math.max(Math.abs(d.gr_l || 0), Math.abs(d.gr_r || 0)) : 0;
+    const actualGr = audioActive ? Math.max(Math.abs(d.gr_l || 0), Math.abs(d.gr_r || 0)) : 0;
+    const nextIn = audioActive && Number.isFinite(d.in_db) ? clampDb(d.in_db) : DB_FLOOR;
+    const nextOut = audioActive && Number.isFinite(d.out_db) ? clampDb(d.out_db) : DB_FLOOR;
+    const nextReduced = audioActive ? transferOutputDb(nextIn) : DB_FLOOR;
+    const visualGr = audioActive ? Math.max(0, nextIn - nextReduced) : 0;
     grHistory.copyWithin(0, 1);
-    grHistory[grHistory.length - 1] = gr;
-    grValEl.textContent = gr > 0.05 ? ('-' + gr.toFixed(1) + ' dB') : '0.0 dB';
+    grHistory[grHistory.length - 1] = visualGr;
+    grValEl.textContent = actualGr > 0.05 ? ('-' + actualGr.toFixed(1) + ' dB') : '0.0 dB';
 
-    const nextIn = audioActive && Number.isFinite(d.in_db) ? clampDb(d.in_db) : -72;
-    const nextOut = audioActive && Number.isFinite(d.out_db) ? clampDb(d.out_db) : -72;
-    const nextReduced = audioActive ? clampDb(nextIn - gr) : -72;
-    const prevIn = inHistory[inHistory.length - 1] ?? -72;
-    const prevReduced = reducedHistory[reducedHistory.length - 1] ?? -72;
-    const prevOut = outHistory[outHistory.length - 1] ?? -72;
+    const prevIn = inHistory[inHistory.length - 1] ?? DB_FLOOR;
+    const prevReduced = reducedHistory[reducedHistory.length - 1] ?? DB_FLOOR;
+    const prevOut = outHistory[outHistory.length - 1] ?? DB_FLOOR;
     const smoothIn = prevIn + (nextIn - prevIn) * 0.35;
     const smoothReduced = prevReduced + (nextReduced - prevReduced) * 0.35;
     const smoothOut = prevOut + (nextOut - prevOut) * 0.35;
@@ -198,11 +200,20 @@ function updateCurveParam(pid, norm) {
 }
 
 function clampDb(db) {
-    return Math.max(-72, Math.min(0, db));
+    return Math.max(DB_FLOOR, Math.min(0, db));
 }
 
 function levelPct(db) {
-    return Math.max(0, Math.min(100, ((clampDb(db) + 72) / 72) * 100));
+    return Math.max(0, Math.min(100, ((clampDb(db) - DB_FLOOR) / -DB_FLOOR) * 100));
+}
+
+function transferOutputDb(db) {
+    const { th, rat, knee } = curveParams;
+    const k = Math.max(knee, 0.01);
+    if (db <= th - k) return db;
+    if (db >= th + k) return th + (db - th) / rat;
+    const x = db - th + k;
+    return db + ((1/rat - 1) * x * x) / (4 * k);
 }
 
 function drawCurve() {
@@ -214,11 +225,11 @@ function drawCurve() {
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 
     const p = 14, w = s - p * 2;
-    const { th, rat, knee } = curveParams;
-    const dMin = -72, dMax = 0;
+    const { th } = curveParams;
+    const dMin = DB_FLOOR, dMax = 0;
     const dx = db => p + (db - dMin) / (dMax - dMin) * w;
     const dy = db => p + w - (db - dMin) / (dMax - dMin) * w;
-    const comp = d => { const h = knee / 2; if (d < th - h) return d; if (d > th + h) return th + (d - th) / rat; const x = d - th + h; return d + ((1/rat - 1) * x * x) / (2 * knee); };
+    const comp = transferOutputDb;
 
     ctx.strokeStyle = 'rgba(75,163,212,0.04)'; ctx.lineWidth = 0.5;
     for (let d = dMin; d <= dMax; d += 12) { const x = dx(d), y = dy(d); ctx.beginPath(); ctx.moveTo(x, p); ctx.lineTo(x, p+w); ctx.stroke(); ctx.beginPath(); ctx.moveTo(p, y); ctx.lineTo(p+w, y); ctx.stroke(); }
@@ -255,11 +266,12 @@ function drawGR() {
     const px = 4, py = 4, pw = w - px*2, ph = h - py*2;
     const xAt = i => px + (i / (n - 1)) * pw;
     const yLevel = db => py + ph - levelPct(db) * 0.01 * ph;
-    const yGR = db => py + Math.min(1, db / 20) * ph;
+    const maxGr = Math.max(0, -transferOutputDb(0));
+    const yGR = db => yLevel(-Math.min(db, maxGr));
 
     ctx.strokeStyle = 'rgba(75,163,212,0.05)';
     ctx.lineWidth = 0.5;
-    for (let db = -60; db <= -12; db += 12) {
+    for (let db = DB_FLOOR; db <= -12; db += 12) {
         const y = yLevel(db);
         ctx.beginPath();
         ctx.moveTo(px, y);
