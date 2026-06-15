@@ -131,7 +131,7 @@ Hall 接口同理，前缀换成 `dfhall_`。
 |------|--------|------|
 | Size | `%3.0f m` | `40 m` |
 | Width | `%3.0f%%` | `100%` |
-| Predelay | `%2.0f ms` | `12 ms` |
+| Predelay \| `%2.0f ms` | `12 ms` |
 | Decay | `%2.1f s` | `2.4 s` |
 | Diffuse | `%2.0f%%` | `90%` |
 | Modulation | `%2.0f%%` | `10%` |
@@ -147,6 +147,8 @@ Hall 接口同理，前缀换成 `dfhall_`。
 Rust 侧维护第二个 `DragonflyReverbDSP` 实例（sample_rate=40960）。参数变化时重新运行：白噪声 8192 samples → 静音直到 8s。收集输出后用 kiss_fft（编译进 staticlib）逐列做 FFT。结果通过 `dfplate_get_viz_json` 以压缩格式（每列一个 base64 编码的亮度数组）传给 WebView。JS canvas 绘制。
 
 ## UI
-UI位于design-gallery/neogrid-minimal。
+UI位于design-gallery/reverb。
 在实现的时候，必须把所有里面的mock的数据都换成真实的数据，每一个数据都必须是真实的！必须是真实的！必须是真实的！必须是真实的！必须是真实的！必须是真实的！必须是真实的！必须是真实的！
 UI已经设计好了，直接照搬就好，不要再发挥你的想象力了，直接照搬就好。
+UI界面的所有数据都在实现插件的时候必须换成真实的数据，任何一个填数据的槽都不允许使用mock数据。
+实现插件的所有功能。

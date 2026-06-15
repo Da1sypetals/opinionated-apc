@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Dragonfly Plate Reverb</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="plugin">
+  <div class="header-area">
+    <div class="logo-text">Dragonfly<br>Plate</div>
+    <div class="presets-box">
+      <div class="panel-label">Presets</div>
+      <div class="presets-grid" id="presetGrid"></div>
+    </div>
+    <div class="algorithm-box">
+      <div class="panel-label">Reverb Type</div>
+      <div class="algorithm-list" id="algorithmList"></div>
+    </div>
+  </div>
+
+  <div class="sliders-box">
+    <div class="fader-col" data-param="dry_level"><div class="fader-label">Dry</div><div class="fader-track"><div class="fader-groove"><div class="fader-fill"></div></div><div class="fader-handle"></div></div><div class="fader-value"></div></div>
+    <div class="fader-col" data-param="wet_level"><div class="fader-label">Wet</div><div class="fader-track"><div class="fader-groove"><div class="fader-fill"></div></div><div class="fader-handle"></div></div><div class="fader-value"></div></div>
+  </div>
+
+  <div class="spectrogram-box">
+    <div class="spectrogram-inner">
+      <canvas class="spectrogram-canvas" id="spectrogramCanvas"></canvas>
+      <div class="spectrogram-y-axis">
+        <div class="spectrogram-y-label">125 Hz</div><div class="spectrogram-y-label">250 Hz</div><div class="spectrogram-y-label">500 Hz</div><div class="spectrogram-y-label">1 kHz</div><div class="spectrogram-y-label">2 kHz</div><div class="spectrogram-y-label">4 kHz</div><div class="spectrogram-y-label">8 kHz</div><div class="spectrogram-y-label">16 kHz</div>
+      </div>
+      <div class="spectrogram-x-axis">
+        <div class="spectrogram-x-label">1/2s</div><div class="spectrogram-x-label">1s</div><div class="spectrogram-x-label">2s</div><div class="spectrogram-x-label">4s</div><div class="spectrogram-x-label">8s</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="knobs-box">
+    <div class="knob-container" data-param="width" data-color="gold"><svg viewBox="0 0 64 64" width="56" height="56"><path class="knob-track" d="M12.2 51.8 A 28 28 0 1 1 51.8 51.8" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/><circle class="value-arc" cx="32" cy="32" r="28" fill="none" stroke="var(--gold)" stroke-width="6" stroke-linecap="round" transform="rotate(135 32 32)"/></svg><span class="knob-label">Width</span><span class="knob-value"></span></div>
+    <div class="knob-container" data-param="predelay" data-color="gold"><svg viewBox="0 0 64 64" width="56" height="56"><path class="knob-track" d="M12.2 51.8 A 28 28 0 1 1 51.8 51.8" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/><circle class="value-arc" cx="32" cy="32" r="28" fill="none" stroke="var(--gold)" stroke-width="6" stroke-linecap="round" transform="rotate(135 32 32)"/></svg><span class="knob-label">Predelay</span><span class="knob-value"></span></div>
+    <div class="knob-container" data-param="decay" data-color="gold"><svg viewBox="0 0 64 64" width="56" height="56"><path class="knob-track" d="M12.2 51.8 A 28 28 0 1 1 51.8 51.8" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/><circle class="value-arc" cx="32" cy="32" r="28" fill="none" stroke="var(--gold)" stroke-width="6" stroke-linecap="round" transform="rotate(135 32 32)"/></svg><span class="knob-label">Decay</span><span class="knob-value"></span></div>
+    <div class="knob-container" data-param="low_cut" data-color="green"><svg viewBox="0 0 64 64" width="56" height="56"><path class="knob-track" d="M12.2 51.8 A 28 28 0 1 1 51.8 51.8" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/><circle class="value-arc" cx="32" cy="32" r="28" fill="none" stroke="var(--green)" stroke-width="6" stroke-linecap="round" transform="rotate(135 32 32)"/></svg><span class="knob-label">Low Cut</span><span class="knob-value"></span></div>
+    <div class="knob-container" data-param="high_cut" data-color="green"><svg viewBox="0 0 64 64" width="56" height="56"><path class="knob-track" d="M12.2 51.8 A 28 28 0 1 1 51.8 51.8" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/><circle class="value-arc" cx="32" cy="32" r="28" fill="none" stroke="var(--green)" stroke-width="6" stroke-linecap="round" transform="rotate(135 32 32)"/></svg><span class="knob-label">High Cut</span><span class="knob-value"></span></div>
+    <div class="knob-container" data-param="damp" data-color="green"><svg viewBox="0 0 64 64" width="56" height="56"><path class="knob-track" d="M12.2 51.8 A 28 28 0 1 1 51.8 51.8" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/><circle class="value-arc" cx="32" cy="32" r="28" fill="none" stroke="var(--green)" stroke-width="6" stroke-linecap="round" transform="rotate(135 32 32)"/></svg><span class="knob-label">Dampen</span><span class="knob-value"></span></div>
+  </div>
+</div>
+<script type="module" src="js/index.js"></script>
+</body>
+</html>

@@ -436,7 +436,7 @@ Problem: A container using `width: fit-content` or flex auto-sizing changes widt
 
 Example: A bank/preset tab list where "Medium Halls" is 2px wider than "Rooms", causing the entire box to resize on every tab click.
 
-Solution: Fix the width of the column that contains variable-length text. Use `width: <fixed>px; flex-shrink: 0` on the text column so it never resizes regardless of content. Use a Playwright script to click through all states and assert the container width is constant:
+Solution: Fix the width of the column that contains variable-length text. Use `width: <fixed>px; flex-shrink: 0` on the text column so it never resizes regardless of content. You must use a Playwright script to click through all states and assert the container width is constant:
 
 ```python
 for tab in tabs:

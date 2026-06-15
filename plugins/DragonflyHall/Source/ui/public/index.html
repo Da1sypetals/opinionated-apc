@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Dragonfly Hall Reverb</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="plugin">
+  <div class="header-area">
+    <div class="logo-text">Dragonfly<br>Hall</div>
+    <div class="box bank-preset-box">
+      <div class="bank-col" id="bankCol"></div>
+      <div class="preset-col" id="presetCol"></div>
+    </div>
+    <div class="box diffuse-box">
+      <div class="knob-container" data-param="diffuse"><svg viewBox="0 0 64 64" width="46" height="46"><path class="knob-track" d="M12.2 51.8 A 28 28 0 1 1 51.8 51.8" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/><circle class="value-arc" cx="32" cy="32" r="28" fill="none" stroke="var(--green)" stroke-width="6" stroke-linecap="round" transform="rotate(135 32 32)"/></svg><span class="knob-label">Diffuse</span><span class="knob-value"></span></div>
+      <div class="knob-container" data-param="modulation"><svg viewBox="0 0 64 64" width="46" height="46"><path class="knob-track" d="M12.2 51.8 A 28 28 0 1 1 51.8 51.8" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/><circle class="value-arc" cx="32" cy="32" r="28" fill="none" stroke="var(--green)" stroke-width="6" stroke-linecap="round" transform="rotate(135 32 32)"/></svg><span class="knob-label">Mod</span><span class="knob-value"></span></div>
+      <div class="knob-container" data-param="spin"><svg viewBox="0 0 64 64" width="46" height="46"><path class="knob-track" d="M12.2 51.8 A 28 28 0 1 1 51.8 51.8" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/><circle class="value-arc" cx="32" cy="32" r="28" fill="none" stroke="var(--green)" stroke-width="6" stroke-linecap="round" transform="rotate(135 32 32)"/></svg><span class="knob-label">Spin</span><span class="knob-value"></span></div>
+      <div class="knob-container" data-param="wander"><svg viewBox="0 0 64 64" width="46" height="46"><path class="knob-track" d="M12.2 51.8 A 28 28 0 1 1 51.8 51.8" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/><circle class="value-arc" cx="32" cy="32" r="28" fill="none" stroke="var(--green)" stroke-width="6" stroke-linecap="round" transform="rotate(135 32 32)"/></svg><span class="knob-label">Wander</span><span class="knob-value"></span></div>
+    </div>
+  </div>
+
+  <div class="box sliders-box">
+    <div class="fader-col" data-param="dry_level"><div class="fader-label">Dry</div><div class="fader-track"><div class="fader-groove"><div class="fader-fill"></div></div><div class="fader-handle"></div></div><div class="fader-value"></div></div>
+    <div class="fader-col" data-param="early_level"><div class="fader-label">Early</div><div class="fader-track"><div class="fader-groove"><div class="fader-fill"></div></div><div class="fader-handle"></div></div><div class="fader-value"></div></div>
+    <div class="fader-col" data-param="early_send"><div class="fader-label">E.Send</div><div class="fader-track"><div class="fader-groove"><div class="fader-fill"></div></div><div class="fader-handle"></div></div><div class="fader-value"></div></div>
+    <div class="fader-col" data-param="late_level"><div class="fader-label">Late</div><div class="fader-track"><div class="fader-groove"><div class="fader-fill"></div></div><div class="fader-handle"></div></div><div class="fader-value"></div></div>
+  </div>
+
+  <div class="box left-knobs-box">
+    <div class="knob-container" data-param="size"><svg viewBox="0 0 64 64" width="52" height="52"><path class="knob-track" d="M12.2 51.8 A 28 28 0 1 1 51.8 51.8" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/><circle class="value-arc" cx="32" cy="32" r="28" fill="none" stroke="var(--green)" stroke-width="6" stroke-linecap="round" transform="rotate(135 32 32)"/></svg><span class="knob-label">Size</span><span class="knob-value"></span></div>
+    <div class="knob-container" data-param="width"><svg viewBox="0 0 64 64" width="52" height="52"><path class="knob-track" d="M12.2 51.8 A 28 28 0 1 1 51.8 51.8" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/><circle class="value-arc" cx="32" cy="32" r="28" fill="none" stroke="var(--green)" stroke-width="6" stroke-linecap="round" transform="rotate(135 32 32)"/></svg><span class="knob-label">Width</span><span class="knob-value"></span></div>
+    <div class="knob-container" data-param="predelay"><svg viewBox="0 0 64 64" width="52" height="52"><path class="knob-track" d="M12.2 51.8 A 28 28 0 1 1 51.8 51.8" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/><circle class="value-arc" cx="32" cy="32" r="28" fill="none" stroke="var(--green)" stroke-width="6" stroke-linecap="round" transform="rotate(135 32 32)"/></svg><span class="knob-label">Predelay</span><span class="knob-value"></span></div>
+    <div class="knob-container" data-param="decay"><svg viewBox="0 0 64 64" width="52" height="52"><path class="knob-track" d="M12.2 51.8 A 28 28 0 1 1 51.8 51.8" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/><circle class="value-arc" cx="32" cy="32" r="28" fill="none" stroke="var(--green)" stroke-width="6" stroke-linecap="round" transform="rotate(135 32 32)"/></svg><span class="knob-label">Decay</span><span class="knob-value"></span></div>
+  </div>
+
+  <div class="box spectrogram-box">
+    <div class="spectrogram-inner">
+      <canvas class="spectrogram-canvas" id="spectrogramCanvas"></canvas>
+      <div class="spectrogram-y-axis">
+        <div class="spectrogram-y-label">125 Hz</div><div class="spectrogram-y-label">250 Hz</div><div class="spectrogram-y-label">500 Hz</div><div class="spectrogram-y-label">1 kHz</div><div class="spectrogram-y-label">2 kHz</div><div class="spectrogram-y-label">4 kHz</div><div class="spectrogram-y-label">8 kHz</div><div class="spectrogram-y-label">16 kHz</div>
+      </div>
+      <div class="spectrogram-x-axis">
+        <div class="spectrogram-x-label">1/2s</div><div class="spectrogram-x-label">1s</div><div class="spectrogram-x-label">2s</div><div class="spectrogram-x-label">4s</div><div class="spectrogram-x-label">8s</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="box eq-box">
+    <div class="knob-container" data-param="high_cut"><svg viewBox="0 0 64 64" width="46" height="46"><path class="knob-track" d="M12.2 51.8 A 28 28 0 1 1 51.8 51.8" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/><circle class="value-arc" cx="32" cy="32" r="28" fill="none" stroke="var(--green)" stroke-width="6" stroke-linecap="round" transform="rotate(135 32 32)"/></svg><span class="knob-label">High Cut</span><span class="knob-value"></span></div>
+    <div class="knob-container" data-param="high_xo"><svg viewBox="0 0 64 64" width="46" height="46"><path class="knob-track" d="M12.2 51.8 A 28 28 0 1 1 51.8 51.8" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/><circle class="value-arc" cx="32" cy="32" r="28" fill="none" stroke="var(--green)" stroke-width="6" stroke-linecap="round" transform="rotate(135 32 32)"/></svg><span class="knob-label">High Cross</span><span class="knob-value"></span></div>
+    <div class="knob-container" data-param="high_mult"><svg viewBox="0 0 64 64" width="46" height="46"><path class="knob-track" d="M12.2 51.8 A 28 28 0 1 1 51.8 51.8" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/><circle class="value-arc" cx="32" cy="32" r="28" fill="none" stroke="var(--green)" stroke-width="6" stroke-linecap="round" transform="rotate(135 32 32)"/></svg><span class="knob-label">High Mult</span><span class="knob-value"></span></div>
+    <div class="knob-container" data-param="low_cut"><svg viewBox="0 0 64 64" width="46" height="46"><path class="knob-track" d="M12.2 51.8 A 28 28 0 1 1 51.8 51.8" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/><circle class="value-arc" cx="32" cy="32" r="28" fill="none" stroke="var(--green)" stroke-width="6" stroke-linecap="round" transform="rotate(135 32 32)"/></svg><span class="knob-label">Low Cut</span><span class="knob-value"></span></div>
+    <div class="knob-container" data-param="low_xo"><svg viewBox="0 0 64 64" width="46" height="46"><path class="knob-track" d="M12.2 51.8 A 28 28 0 1 1 51.8 51.8" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/><circle class="value-arc" cx="32" cy="32" r="28" fill="none" stroke="var(--green)" stroke-width="6" stroke-linecap="round" transform="rotate(135 32 32)"/></svg><span class="knob-label">Low Cross</span><span class="knob-value"></span></div>
+    <div class="knob-container" data-param="low_mult"><svg viewBox="0 0 64 64" width="46" height="46"><path class="knob-track" d="M12.2 51.8 A 28 28 0 1 1 51.8 51.8" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/><circle class="value-arc" cx="32" cy="32" r="28" fill="none" stroke="var(--green)" stroke-width="6" stroke-linecap="round" transform="rotate(135 32 32)"/></svg><span class="knob-label">Low Mult</span><span class="knob-value"></span></div>
+  </div>
+</div>
+<script type="module" src="js/index.js"></script>
+</body>
+</html>
